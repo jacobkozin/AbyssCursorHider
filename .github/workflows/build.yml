@@ -23,10 +23,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure
-        run: cmake --preset windows-x64
+        # Let CMake select the Visual Studio version installed on the hosted
+        # runner. The local developer preset intentionally remains on VS 2022.
+        run: cmake -S . -B build/windows-x64 -A x64 -DABYSS_BUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build build/windows-x64 --config ${{ matrix.configuration }} --parallel
+        run: cmake --build build/windows-x64 --config ${{ matrix.configuration }}
 
       - name: Test
         run: ctest --test-dir build/windows-x64 -C ${{ matrix.configuration }} --output-on-failure
