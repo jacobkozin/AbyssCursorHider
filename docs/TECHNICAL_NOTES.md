@@ -1,56 +1,78 @@
 # Technical notes
 
-These notes describe what can be established from the supplied v4.17 release bundle without executing it. They are intended to make the current binary-only state explicit for maintainers and reviewers.
+## Source status
 
-## Supplied components
+The repository contains a new implementation of the documented v4.17 behavior,
+developed as v5.0.0. It is not recovered original source. The historical v4.17
+main executable embeds the compilation-unit name `y_v417.c`; that file is not
+present in any supplied archive or searched backup location.
 
-| Component | Purpose | Format |
-| --- | --- | --- |
-| `AbyssCursorHide.exe` | Main notification-area application | Native Windows x64 GUI executable |
-| `RestoreCursor.exe` | Reloads the Windows cursor scheme | Native Windows x64 GUI executable |
-| `abyss_cursor_hide.ico` | Runtime/tray icon | 13-image Windows icon, 16x16 through 256x256 |
-| `README.txt` | Original v4.17 delta note | Plain text; retained locally and migrated to `CHANGELOG.md` |
+The distinction matters:
 
-The two executables remain in the local prepared folder but are ignored by Git. They should be distributed as release assets rather than normal source-branch contents.
+- v4.17 can be identified and described by its verified hashes and behavior;
+- v4.17 cannot be rebuilt, audited at source level, or reproduced exactly; and
+- v5 can be reviewed and built entirely from this repository but must be tested
+  as a new implementation.
 
-## Observed application behavior
+## Reconstructed implementation
 
-Static imports and embedded labels indicate that the main application:
+| Area | v5 implementation |
+| --- | --- |
+| Platform | Native Windows x64 GUI applications |
+| Language | C++17 with official Windows SDK headers |
+| UI | Notification-area icon and native popup menu |
+| Input | Background Raw Input with redundant 100 ms mouse-state polling |
+| Persistence | Current-user registry settings and optional Run entry |
+| Build | CMake, MSVC, Windows SDK, warnings as errors |
+| Recovery | In-process cleanup, external/self-watchdog, and manual utility |
+| CI | Windows build, tests, package artifact |
 
-- creates a Windows notification-area icon and popup menu;
-- offers delays of 1, 2, 3, 5, 10, 15, 30, and 60 seconds;
-- exposes enabled/paused, **Hide Now**, **Start with Windows**, and **Exit** actions;
-- hides and restores system cursor resources through User32 APIs;
-- monitors pointer movement and mouse clicks to restore the cursor;
-- uses a named mutex to prevent multiple running instances;
-- persists `Enabled` and `DelaySeconds` values under `HKEY_CURRENT_USER\Software\AbyssCursorHide`;
-- optionally writes an `AbyssCursorHide` value beneath the current user's Windows `Run` key; and
-- loads `abyss_cursor_hide.ico` from beside the application, with a fallback icon path.
+No environment variables, networking libraries, third-party packages, database,
+log, service, driver, or elevated process are required.
 
-The recovery executable uses `LoadCursorW`, `SetCursor`, and `SystemParametersInfoW`; its messages identify its purpose as restoring the Windows cursor scheme.
+## Release-build observations
 
-## Platform and implementation evidence
+Local x64 Release builds have been verified to include:
 
-- Both executables are PE32+ GUI programs for AMD64 (`0x8664`), not managed .NET assemblies.
-- The main executable contains a compilation-unit reference named `y_v417.c`, supporting a native C implementation.
-- The main executable imports Kernel32, User32, and Shell32 functions and dynamically resolves registry and DPI functions from Windows system libraries.
-- The available binary does not identify an exact compiler or build command, so neither is documented as authoritative.
-- Both files are unsigned and omit populated company, product, file-version, and original-filename fields.
-- The main executable retains internal symbol names. A production rebuild should remove unintended debug/linker symbols after preserving them separately for maintainers.
+- PE32+ Windows GUI subsystem;
+- no COFF symbol table in the final image;
+- ASLR and high-entropy virtual addresses;
+- NX/DEP compatibility;
+- Control Flow Guard instrumentation and function table;
+- CET compatibility metadata;
+- embedded per-monitor V2 DPI and as-invoker manifest;
+- embedded multi-resolution icon; and
+- populated company, product, file-version, and original-filename resources.
 
-## Security and privacy observations
+Development builds are not Authenticode-signed. Signing is intentionally kept
+outside the repository because private keys and certificate passwords must never
+enter Git history.
 
-The supplied files contain no detected usernames, user-profile paths, email addresses, URLs, IP addresses, API tokens, passwords, private-key markers, certificates, databases, environment files, or alternate data streams. No networking API imports or network endpoints were observed.
+## Cursor API constraints
 
-Those are bounded static observations, not guarantees about runtime behavior. Complete validation requires the source code, a documented build, and controlled runtime testing.
+`ShowCursor` maintains a display count associated with the calling thread and is
+not sufficient to hide the pointer consistently across other applications.
+Consequently, the app uses `SetSystemCursor`, matching the behavior of the
+historical implementation. This changes the current user's global system cursor
+resources until `SPI_SETCURSORS` reloads the configured scheme.
 
-## Work required for a reproducible source repository
+That API choice creates the project's most important failure mode: abrupt process
+termination while hidden can otherwise leave transparent cursor resources
+active. The separate watchdog and manual restoration utility specifically
+mitigate that risk.
 
-1. Recover the authoritative source for both executables.
-2. Document the compiler, SDK, build flags, and supported Windows versions.
-3. Add a deterministic build definition and dependency lock or provenance information.
-4. Add unit and behavior tests, especially around timer behavior, startup registration, DPI positioning, and cursor restoration.
-5. Add CI that builds and tests from a tagged commit.
-6. Add Windows manifests and complete version resources.
-7. Strip release binaries, preserve private debug symbols, scan artifacts, publish checksums, and Authenticode-sign releases.
-8. Confirm ownership and redistribution rights for the source and icon, then add an appropriate license.
+## Historical binary observations
+
+The supplied v4.17 main and recovery executables are unsigned x64 native
+applications. Their static content contains no detected username, user-profile
+path, credential, private key, email, URL, IP address, environment file,
+database, or networking import. Those bounded observations establish neither
+source provenance nor malware safety.
+
+The historical main executable has ASLR, NX, and high-entropy VA enabled but
+retains a full COFF symbol table and lacks populated version information. The v5
+build corrects those packaging deficiencies while preserving the intended user
+experience.
+
+See [`HISTORY.md`](HISTORY.md) for the version timeline and
+[`ARCHITECTURE.md`](ARCHITECTURE.md) for the new design.

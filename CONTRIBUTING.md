@@ -1,25 +1,55 @@
 # Contributing
 
-Thank you for taking the time to improve Abyss Cursor Hide.
+Thank you for improving Abyss Cursor Hide.
 
-## Current scope
+## Before contributing
 
-This repository currently contains documentation and metadata for a binary-only v4.17 release. The authoritative source code, build configuration, and tests were not included in the supplied project. Until those files are recovered, contributions should focus on reproducible bug reports and documentation corrections rather than speculative code replacements.
+The current source is a clean v5 reconstruction of documented v4.17 behavior,
+not recovered original v4.17 source. Avoid changing history or documentation in
+a way that implies the legacy binary is reproducible.
 
-## Reporting a bug
+Contributions are accepted under the repository's [MIT License](LICENSE).
+Discuss substantial changes with the maintainer before investing significant
+work so the proposed direction can be agreed upon first.
 
-Use the bug-report issue template and include:
+## Development setup
 
-- Abyss Cursor Hide version
-- Windows edition, version, and architecture
-- Clear reproduction steps
-- Expected and actual behavior
-- Whether `RestoreCursor.exe` restored the cursor scheme
+Install Visual Studio 2022 or newer with the Desktop development with C++
+workload, a Windows SDK, and CMake 3.25 or newer. Then run:
 
-Remove usernames, filesystem paths, registry exports, screenshots with private information, credentials, and other personal data before posting.
+```powershell
+cmake --preset windows-x64
+cmake --build --preset debug --parallel
+ctest --preset debug
+```
 
-## Proposing a change
+## Change expectations
 
-For documentation changes, keep claims tied to observable behavior or static evidence and explain how the change was checked. Once source and build instructions are available, code contributions should also include focused tests and a successful clean build.
+- Keep the utility native, offline, per-user, and usable without elevation.
+- Preserve reliable cursor restoration on every exit and error path.
+- Treat changes to `SetSystemCursor`, startup registration, or the watchdog as
+  security-sensitive.
+- Add focused tests for validation or platform-independent logic.
+- Build with warnings as errors and run the appropriate manual checks in
+  [`docs/TESTING.md`](docs/TESTING.md).
+- Update user-facing documentation and `CHANGELOG.md` when behavior changes.
+- Do not commit executables, ZIPs, build folders, registry exports, logs, dumps,
+  credentials, certificates, signing material, or machine-specific settings.
 
-Do not report security vulnerabilities in a public issue. Follow [SECURITY.md](SECURITY.md) instead.
+## Pull requests
+
+Describe the problem, the chosen approach, testing performed, Windows versions
+used, and any behavior that could not be tested. Keep unrelated changes out of
+the same pull request.
+
+For cursor behavior, include explicit results for normal restoration and forced
+termination recovery. For notification-area changes, include scaling and
+Explorer-restart checks.
+
+## Bug reports
+
+Use the bug-report template and remove usernames, filesystem paths, registry
+exports, screenshots with private information, credentials, and other personal
+data before posting.
+
+Do not report vulnerabilities in a public issue. Follow [`SECURITY.md`](SECURITY.md).

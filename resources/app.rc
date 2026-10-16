@@ -1,0 +1,33 @@
+#include <windows.h>
+#include "resource.h"
+
+IDI_APP_ICON ICON "../abyss_cursor_hide.ico"
+1 RT_MANIFEST "app.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 5,0,0,0
+ PRODUCTVERSION 5,0,0,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEFLAGS VS_FF_PRERELEASE
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Abyss Cursor Hide\0"
+            VALUE "FileDescription", "Abyss Cursor Hide\0"
+            VALUE "FileVersion", "5.0.0-dev\0"
+            VALUE "InternalName", "AbyssCursorHide\0"
+            VALUE "OriginalFilename", "AbyssCursorHide.exe\0"
+            VALUE "ProductName", "Abyss Cursor Hide\0"
+            VALUE "ProductVersion", "5.0.0-dev\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
