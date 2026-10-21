@@ -3,38 +3,47 @@
 Notable changes are recorded here. The v4 entries are reconstructed from the
 verified release notes and development conversation; v4.17 itself is binary-only.
 
-## [Unreleased] - v5.0.0 reconstruction
+## [5.0.0] - 2026-10-21
 
-### Added
+The first release built from source. v5 is a clean rebuild of the v4.17 tray
+app, whose source was lost.
 
-- Complete native C++17 source for the main application and recovery utility.
-- CMake configuration, developer presets, unit tests, packaging, and Windows CI.
-- Event-driven Raw Input with redundant 100 ms mouse-state polling.
-- Windows session notifications so lock/unlock and secure-desktop transitions
-  restore safely.
-- Silent recovery watchdog for cursor restoration after forced termination.
-- Self-watchdog fallback when `RestoreCursor.exe` is absent, preserving recovery
-  for single-file deployments.
-- Embedded icon, Windows compatibility/DPI manifest, and version resources.
-- Architecture, testing, history, and release documentation.
+### What it does
 
-### Security
+- Hides the mouse pointer after 1 to 60 seconds without mouse input, and
+  brings it back on any movement, click or scroll.
+- Tray menu with **Auto-hide enabled**, **Hide delay**, **Start with Windows**,
+  **Hide Now** and **Exit**. Settings are saved per Windows user.
+- A watchdog (a second copy of the app started with `--watch <pid>`) restores
+  the pointer if the app is killed, and starting the app again also restores
+  it. `RestoreCursor.exe` is a one-click manual fix.
+- Restores the pointer on lock, UAC prompts, Remote Desktop changes, waking
+  from sleep, sign-out and shutdown, and re-adds its tray icon when Explorer
+  restarts.
+- Native C++17 and Win32, per-monitor DPI aware, no administrator rights, no
+  network access and nothing extra to install.
 
-- Enabled strict warnings, SDL checks, ASLR, high-entropy VA, NX/DEP, Control
-  Flow Guard, and CET-compatible linking.
-- Replaced hand-written platform declarations with official Windows SDK headers.
-- Quoted and validated the per-user startup command.
+### Fixed during final testing
 
-### Status
+- Hide Now did nothing while auto-hide was paused, and could undo itself right
+  after the click.
+- Start with Windows ignored the on/off switch in Task Manager's Startup apps.
+- After a second launch, the running copy's menu might not close when clicking
+  elsewhere.
 
-- Debug and Release x64 builds compile with warnings treated as errors.
-- Core unit tests pass in both configurations.
-- MSVC static analysis completes without diagnostics.
-- A controlled process-lifetime test confirmed the recovery watchdog responds to
-  forced termination without leaving a process running.
-- The maintainer confirmed interactive parity with the historical v4.17 behavior.
-- The expanded Windows/DPI compatibility matrix remains recommended before a
-  production release.
+### Build and release
+
+- CMake presets for Visual Studio 2022 or newer. GitHub Actions builds and tests
+  Debug and Release on every change and drafts a release, with the ZIP and its
+  SHA-256, for each version tag.
+- Warnings as errors, SDL checks, ASLR, DEP, Control Flow Guard and CET
+  compatibility. MSVC `/analyze` reports no warnings.
+
+### Known issues
+
+- The executables are not code-signed. Windows SmartScreen may warn about them,
+  and some antivirus products flag new unsigned programs. See
+  [docs/ANTIVIRUS.md](https://github.com/jacobkozin/AbyssCursorHider/blob/main/docs/ANTIVIRUS.md).
 
 ## [4.17]
 

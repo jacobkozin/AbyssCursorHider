@@ -1,164 +1,148 @@
 <p align="center">
-  <img src="abyss_cursor_hide.ico" alt="Abyss Cursor Hide icon" width="96" height="96">
+  <img src="docs/images/icon.png" alt="Abyss Cursor Hide icon: a glowing mouse pointer breaking apart" width="112" height="112">
 </p>
 
 # Abyss Cursor Hide
 
 [![Build and test](https://github.com/jacobkozin/AbyssCursorHider/actions/workflows/build.yml/badge.svg)](https://github.com/jacobkozin/AbyssCursorHider/actions/workflows/build.yml)
 
-Abyss Cursor Hide is a focused Windows notification-area utility that hides the
-mouse pointer after a configurable period of inactivity and restores it as soon
-as the mouse moves or any mouse button is pressed. It is a native Win32
-application with no network access, telemetry, external runtime, or
-administrator requirement.
+A small Windows tray utility that hides the mouse pointer when you stop moving
+it, and brings it back the instant you do.
 
-> **Development status:** The source on `main` is a clean reconstruction of the
-> behavior of the historical v4.17 binary. It is being developed as v5.0.0 and
-> has not been published as a release. The deleted original v4.17 source was not
-> recovered, so this project does not claim source-level identity with that
-> binary.
+It is native Win32 C++ with no installer, no administrator rights, no network
+access and nothing extra to install.
+
+<p align="center">
+  <img src="docs/images/tray-menu.png" alt="The tray menu: Auto-hide enabled, Hide delay with choices from 1 to 60 seconds, Start with Windows, Hide Now and Exit" width="557">
+</p>
 
 ## Features
 
-- Hides Windows system cursors after 1, 2, 3, 5, 10, 15, 30, or 60 seconds
-- Restores the cursor on movement, wheel input, or any of five mouse buttons
-- Uses redundant mouse-state polling and session notifications for elevated
-  windows, workstation lock, and secure-desktop transitions
-- Offers **Auto-hide enabled**, **Hide delay**, **Start with Windows**,
-  **Hide Now**, and **Exit** from the notification-area menu
-- Reopens the menu at the same anchored position after a setting changes
-- Opens the menu upward, eight pixels above its notification-area anchor
-- Saves the enabled state and delay for the current Windows user
-- Prevents duplicate instances and surfaces the existing instance when reopened
-- Embeds a multi-resolution icon and declares per-monitor V2 DPI awareness
-- Launches a silent recovery watchdog and includes a manual recovery utility
-- Builds entirely from reviewed repository source with CMake and MSVC
+- Hides the pointer after 1, 2, 3, 5, 10, 15, 30 or 60 seconds without mouse
+  input (3 seconds by default).
+- Brings it back on any movement, click (left, right, middle, back, forward)
+  or scroll. Typing does not count, so the pointer stays out of the way while
+  you type.
+- Tray menu: **Auto-hide enabled**, **Hide delay**, **Start with Windows**,
+  **Hide Now** and **Exit**.
+- Remembers your settings per Windows user. Start with Windows is off until
+  you turn it on, and it respects the switch in Task Manager's Startup apps.
+- A watchdog brings the pointer back if the app is closed unexpectedly, and
+  `RestoreCursor.exe` is a one-click manual fix.
+- Per-monitor DPI aware, so the menu stays sharp on high-DPI and
+  mixed-scaling setups.
+
+## Download and run
+
+1. Download `AbyssCursorHide-5.0.0-windows-x64.zip` from
+   [Releases](https://github.com/jacobkozin/AbyssCursorHider/releases) and unzip
+   it to a folder you keep, such as `%LOCALAPPDATA%\AbyssCursorHide`.
+2. Run `AbyssCursorHide.exe`. Its icon appears in the notification area
+   (it may be behind the **^** arrow).
+3. Click the icon to open the menu.
+
+Keep `RestoreCursor.exe` in the same folder, and choose **Exit** before moving
+or deleting the folder. Requires 64-bit Windows 10 or 11.
+
+> **The executables are not code-signed yet.** Windows SmartScreen may say it
+> doesn't recognize the app (choose **More info**, then **Run anyway**), and
+> some antivirus products flag new unsigned programs. Each release lists
+> SHA-256 checksums, and [docs/ANTIVIRUS.md](docs/ANTIVIRUS.md) explains what
+> was flagged during testing and how to check a download yourself.
+
+## How it works
+
+Windows has no setting that hides the pointer everywhere, so the app does what
+cursor hiders generally do. When the delay runs out, it swaps every standard
+system cursor for a transparent one with `SetSystemCursor`. When the mouse is
+used again, it reloads your normal cursor scheme with
+`SystemParametersInfo(SPI_SETCURSORS)`.
+
+It watches the mouse two ways:
+
+- **Raw Input** events bring the pointer back the moment the mouse moves,
+  clicks or scrolls.
+- A **100 ms poll** of the pointer position and buttons keeps working when an
+  elevated window such as Task Manager is in front, where background programs
+  stop receiving some input events.
+
+It is light. Measured on a Windows 11 PC over 86 hours of normal use, it
+averaged 0.03% of one CPU core, with a single thread and about 13 MB of memory.
 
 ## Safety model
 
-Windows does not provide a process-independent `ShowCursor` switch. To hide the
-pointer across applications, Abyss Cursor Hide temporarily replaces the current
-user's system cursor shapes with transparent cursors through `SetSystemCursor`.
-It reloads the configured Windows cursor scheme when activity resumes, when the
-application exits, when Windows shuts down, or when an unhandled failure occurs.
-If Windows switches to an input desktop the application cannot access, it
-restores the scheme and will not hide it again until normal desktop access
-returns.
+Hidden cursors are a system-wide change, so the app is built to always give the
+pointer back:
 
-The main process launches a lightweight watchdog. It uses `RestoreCursor.exe`
-when that packaged companion is available and otherwise launches a silent
-watchdog mode from the main executable itself. If the interactive process is
-terminated unexpectedly while the cursor is hidden, the watchdog reloads the
-Windows cursor scheme. `RestoreCursor.exe` can also be launched manually at any
-time.
+| Situation | What brings the pointer back |
+| --- | --- |
+| You move, click or scroll | Raw Input, or the 100 ms poll |
+| You lock the PC, a UAC prompt appears, or a Remote Desktop session connects or disconnects | Session notifications, and the poll stops hiding while the secure desktop is up |
+| You pause auto-hide, change the delay, or the PC wakes from sleep | The app restores right away |
+| You choose Exit, sign out or shut down | Normal cleanup |
+| The app crashes | Its unhandled-exception handler |
+| The app's process is killed, for example with `taskkill /F` | The watchdog: a second copy of `AbyssCursorHide.exe`, started with `--watch <pid>`, waits for the app to exit and then reloads the cursor scheme |
+| All of the above failed | Run `RestoreCursor.exe`, start the app again, or sign out |
 
-## Requirements
-
-### Running
-
-- Windows 10 or Windows 11, x64
-- No administrator access
-- No external runtime or internet connection
-
-### Building
-
-- Visual Studio 2022 or newer with **Desktop development with C++**
-- Windows 10/11 SDK
-- CMake 3.25 or newer
+The transparent cursors are never saved to your profile, so signing out or
+restarting always brings your normal pointer back.
 
 ## Build from source
 
-From a Developer PowerShell or Developer Command Prompt:
+You need Visual Studio 2022 or newer with the **Desktop development with C++**
+workload. It includes CMake. From a Developer PowerShell in the repository:
 
 ```powershell
 cmake --preset windows-x64
-cmake --build --preset release --parallel
+cmake --build --preset release
 ctest --preset release
+cmake --build --preset package   # optional: builds the release ZIP
 ```
 
-The executables are produced in:
+The programs are written to `build/windows-x64/Release/`. GitHub Actions runs
+the same presets for Debug and Release on every push to `main` and every pull
+request. Pushing a version tag also builds the ZIP and opens a draft GitHub
+Release with its SHA-256 checksum.
+
+Builds treat warnings as errors and turn on SDL checks, ASLR, DEP, Control Flow
+Guard and CET compatibility.
+
+## Project layout
 
 ```text
-build/windows-x64/Release/AbyssCursorHide.exe
-build/windows-x64/Release/RestoreCursor.exe
+src/main.cpp               Tray app: window, menu, timer, Raw Input, watchdog
+src/cursor_controller.cpp  Hiding and restoring the system cursors
+src/windows_settings.cpp   Saved settings and the Start with Windows entry
+src/restore_cursor.cpp     RestoreCursor.exe, the manual recovery tool
+src/core.cpp               Small pure functions shared with the unit tests
+tests/core_tests.cpp       Unit tests, run by ctest
+resources/                 Icon, manifest (per-monitor DPI, no admin) and version info
+docs/                      Architecture, testing, releasing, antivirus notes and history
 ```
 
-To create the unsigned ZIP package used by continuous integration:
+## Settings
 
-```powershell
-cmake --build build/windows-x64 --config Release --target package
-```
+Settings are stored per user under `HKEY_CURRENT_USER\Software\AbyssCursorHide`
+(`Enabled` and `DelaySeconds`). Start with Windows adds an `AbyssCursorHide`
+value under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`.
+There are no config files or logs, and the app never uses the network.
 
-Build products remain ignored by Git. The GitHub Actions workflow performs the
-same configure, build, test, and packaging sequence on Windows.
+## More documentation
 
-## Use
+- [Architecture](docs/ARCHITECTURE.md): how the pieces fit together.
+- [Testing](docs/TESTING.md): unit tests and the manual checklist, with the
+  latest results.
+- [Antivirus false positives](docs/ANTIVIRUS.md): what was flagged and why.
+- [Releasing](docs/RELEASING.md): how a version is tagged, built and published.
+- [History](docs/HISTORY.md): versions 1 through 4.17, and why v5 is a rebuild.
 
-1. Keep `AbyssCursorHide.exe` and `RestoreCursor.exe` in the same folder so the
-   manual recovery option remains available.
-2. Launch `AbyssCursorHide.exe`.
-3. Use the notification-area icon to select the delay or pause automatic hiding.
-4. Move or click the mouse to restore a hidden cursor.
-5. Choose **Exit** before replacing or removing the program.
+## History in brief
 
-The default is enabled with a three-second delay. **Start with Windows** is off
-until explicitly enabled.
-
-## Local configuration
-
-No `.env` file or environment variables are used. Per-user settings are stored
-under:
-
-```text
-HKEY_CURRENT_USER\Software\AbyssCursorHide
-```
-
-The optional startup entry is stored under:
-
-```text
-HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
-```
-
-The application does not create a database or log file and contains no
-networking functionality.
-
-## Project structure
-
-```text
-.
-|-- .github/                 Issue templates and Windows CI
-|-- checksums/               Historical release integrity hashes
-|-- docs/                    Architecture, testing, history, and release notes
-|-- include/abyss/           Public internal interfaces
-|-- resources/               Manifest, icon resources, and version metadata
-|-- src/                     Main app, settings, cursor, and recovery sources
-|-- tests/                   Dependency-free unit tests
-|-- CMakeLists.txt           Build, hardening, test, install, and package rules
-|-- CMakePresets.json        Repeatable Windows x64 developer commands
-|-- LICENSE                  MIT License
-`-- README.md                Project overview
-```
-
-Implementation details and design decisions are documented in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Validation instructions are in
-[`docs/TESTING.md`](docs/TESTING.md).
-
-## Security and releases
-
-Release builds enable ASLR, high-entropy address space, DEP/NX, Control Flow
-Guard, CET compatibility, SDL checks, and strict compiler warnings. Generated
-development binaries remain unsigned; a checksum identifies a file but does not
-establish publisher identity. See [`SECURITY.md`](SECURITY.md) and
-[`docs/RELEASING.md`](docs/RELEASING.md) before distributing a build.
-
-## Historical v4.17 package
-
-The verified legacy binary package is retained as historical evidence, not as a
-reproducible build. Its original main compilation unit was named `y_v417.c`, but
-that file was deleted before this repository was prepared. See
-[`docs/HISTORY.md`](docs/HISTORY.md) and
-[`checksums/SHA256SUMS-v4.17.txt`](checksums/SHA256SUMS-v4.17.txt).
+Versions 1 through 4.17 were built in September 2026. The source file for the
+final v4.17 binary was lost, so v5 is a clean rebuild of that behavior, with
+unit tests, CI and documentation. Only the old binary's checksums are kept, in
+`checksums/`; it is not built from this repository.
 
 ## License
 
-Released under the [MIT License](LICENSE).
+MIT. See [LICENSE](LICENSE).

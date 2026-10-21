@@ -32,6 +32,12 @@ linking, modular code, tests, metadata, and CI.
 | 4.16 | Anchored the popup to open upward from the notification area |
 | 4.17 | Raised that popup anchor by eight pixels |
 
+## v5
+
+| Version | Change |
+| --- | --- |
+| 5.0.0 (2026-10-21) | First release built from source: a clean rebuild with unit tests, CI and documentation. Final testing moved the watchdog into the main program and fixed Hide Now and Start with Windows bugs. See [`../CHANGELOG.md`](../CHANGELOG.md). |
+
 ## Verified v4.17 identity
 
 The package recovered directly from the historical conversation is byte-for-byte
@@ -47,6 +53,6 @@ The same four payload files also appeared in an alternate outer ZIP named
 not different executable contents. Both identities are recorded in
 [`../checksums/SHA256SUMS-v4.17.txt`](../checksums/SHA256SUMS-v4.17.txt).
 
-Neither historical ZIP is committed to the source branch. Executables and
-release packages belong on a GitHub Release, accompanied by checksums and an
-explicit statement that v4.17 is unsigned and not source-reproducible.
+Neither historical ZIP is committed or published; only their hashes are
+recorded here. The v4.17 binaries are unsigned and cannot be rebuilt from
+source.

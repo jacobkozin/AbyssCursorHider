@@ -2,47 +2,48 @@
 
 ## Supported versions
 
-No production source-based release is supported yet. The v5 reconstruction on
-`main` is prerelease development code. Historical v4.17 binaries are unsigned,
-binary-only, and retained solely as verified project history.
+| Version | Supported |
+| --- | --- |
+| 5.0.x | Yes |
+| 4.17 and earlier | No. These were binary-only builds and are kept only as history. |
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability reporting flow from the repository's
-**Security** tab when available. If private reporting has not been enabled, open
-a minimal issue asking the maintainer to establish a private contact channel;
-do not include vulnerability details in that issue.
+Please use GitHub's private vulnerability reporting from the repository's
+**Security** tab. If that is not available, open a short issue asking for a
+private contact, without any vulnerability details.
 
-Include the affected commit or version, Windows version, reproduction steps,
-impact, and suggested mitigation. Remove credentials, personal data, registry
-exports, dumps, and unrelated machine information.
+Include the affected version or commit, your Windows version, steps to
+reproduce, and the impact. Leave out credentials, personal data, registry
+exports, crash dumps and unrelated machine information.
 
 ## Security design
 
-- No network or telemetry code is present.
-- No administrator privileges are requested.
-- Settings and startup registration are scoped to the current user.
-- Startup paths are validated and quoted.
-- Raw Input plus redundant mouse-state polling observes activity without a
-  global hook DLL.
-- Cursor changes are reversed on activity, normal exit, shutdown, unhandled
-  failure, session/input-desktop transitions, watchdog detection, or manual
-  recovery.
-- Release builds enable modern Windows exploit mitigations.
+- No network or telemetry code.
+- No administrator rights are requested.
+- Settings and the Start with Windows entry are stored for the current user
+  only.
+- The Start with Windows command is the quoted path of the executable; paths
+  containing a quote are rejected.
+- Mouse activity is read with Raw Input and a 100 ms poll. There is no hook DLL
+  and no code is injected into other processes.
+- The hidden cursors are reversed on mouse activity, on lock and session
+  changes, on exit, sign-out and shutdown, from the crash handler, by the
+  watchdog process, when the app starts, and by `RestoreCursor.exe`.
+- Release builds turn on ASLR, DEP, Control Flow Guard and CET compatibility.
 
-## Important platform risk
+## Known risk
 
-The program temporarily changes global system cursor resources. A failure that
-terminates both the main process and watchdog could leave transparent cursors
-active until the cursor scheme is reloaded, the recovery utility runs, or the
-user signs out. Keep `RestoreCursor.exe` with the main program.
+Hiding the pointer changes system-wide cursor resources for the current user.
+If the app and its watchdog were both killed while the pointer was hidden, the
+pointer would stay transparent until it is restored by starting the app again,
+running `RestoreCursor.exe`, or signing out. The change is never saved to the
+user's profile, so signing out always restores it.
 
 ## Release verification
 
-Checksums establish file identity only. They do not prove publisher identity or
-that a binary is safe. Production releases should be built from a reviewed tag,
-scanned, Authenticode-signed, timestamped, and published with SHA-256 checksums.
-Signing keys and passwords must never be committed or stored as ordinary CI
-variables without an approved secret-management design.
-
-See [`docs/RELEASING.md`](docs/RELEASING.md) for the complete release checklist.
+The executables are not code-signed yet, and some antivirus products flag new
+unsigned programs. Each release lists SHA-256 checksums for the ZIP, and the
+ZIP is built by GitHub Actions from the tagged commit. A checksum shows that a
+file is the published one; it does not prove the file is safe. See
+[docs/ANTIVIRUS.md](docs/ANTIVIRUS.md) and [docs/RELEASING.md](docs/RELEASING.md).

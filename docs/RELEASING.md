@@ -1,59 +1,64 @@
 # Releasing
 
-This checklist separates ordinary continuous-integration artifacts from a
-public release. CI artifacts are unsigned and should not be presented as an
-authenticated production build.
+Releases are built by GitHub Actions from a version tag, so the published ZIP
+always comes from the public source at that tag. Nothing is published
+automatically: the workflow only creates a draft.
 
-## Prepare
+## 1. Prepare the version
 
-1. Complete the manual checklist in [`TESTING.md`](TESTING.md).
-2. Update `CHANGELOG.md` and remove the prerelease flag/version suffix from the
-   resource files.
-3. Confirm `LICENSE` is present in both the source archive and packaged build.
-4. Build from a clean tagged commit on a controlled Windows build environment.
+1. Set the version in `project()` in `CMakeLists.txt`. The file properties of
+   both executables and the ZIP name are generated from it.
+2. Add a `## [x.y.z] - YYYY-MM-DD` section at the top of `CHANGELOG.md`. The
+   release workflow uses that section as the release notes and stops if it is
+   missing.
+3. Run the manual checklist in [TESTING.md](TESTING.md) on a Release build and
+   update its results.
+4. Build and test locally:
 
-## Build and test
+   ```powershell
+   cmake --preset windows-x64
+   cmake --build --preset release
+   ctest --preset release
+   cmake --build --preset package
+   ```
 
-```powershell
-cmake --preset windows-x64
-cmake --build --preset release --parallel
-ctest --preset release
-cmake --build build/windows-x64 --config Release --target package
-```
+5. Commit, push to `main`, and wait for the **Build and test** workflow to pass.
 
-Do not package locally ignored historical executables. The package must contain
-only products built from the release commit.
-
-## Inspect
-
-- Review compiler output and confirm there were no warnings.
-- Inspect imports, PE security flags, embedded manifests, and version resources.
-- Scan the executables and ZIP with the available endpoint-security tools.
-- Check the package for credentials, local paths, debug databases, logs, dumps,
-  and intermediate build files.
-- Verify `AbyssCursorHide.exe` and `RestoreCursor.exe` stay together.
-
-## Sign and hash
-
-If an Authenticode certificate is available, sign both executables before
-packaging and timestamp the signatures through the certificate provider. Never
-store the certificate or its password in the repository.
-
-Generate checksums only after signing and final packaging:
+## 2. Tag and draft
 
 ```powershell
-Get-FileHash .\AbyssCursorHide.exe -Algorithm SHA256
-Get-FileHash .\RestoreCursor.exe -Algorithm SHA256
-Get-FileHash .\AbyssCursorHide-5.0.0-windows-x64.zip -Algorithm SHA256
+git tag -a v5.0.0 -m "Abyss Cursor Hide 5.0.0"
+git push origin v5.0.0
 ```
 
-## Publish
+The tag runs the normal build and test jobs, then the `draft-release` job,
+which:
 
-1. Create a version tag that points to the reviewed commit.
-2. Create a GitHub Release from that tag.
-3. Attach the final ZIP and a plain-text SHA-256 file.
-4. State clearly whether the files are signed.
-5. Download the published assets and verify their hashes one final time.
+- configures, builds, tests and packages Release from the tagged commit;
+- writes `SHA256SUMS.txt` for the ZIP; and
+- creates a **draft** GitHub Release with the ZIP, `SHA256SUMS.txt` and the
+  matching `CHANGELOG.md` section.
 
-Never commit release executables, ZIP files, certificates, or signing secrets to
-the normal Git history.
+## 3. Check and publish
+
+1. Download the ZIP and `SHA256SUMS.txt` from the draft and compare the hash:
+
+   ```powershell
+   Get-FileHash .\AbyssCursorHide-5.0.0-windows-x64.zip -Algorithm SHA256
+   ```
+
+2. Unzip it, run the programs once, and confirm the file properties show the
+   new version.
+3. Check that the release notes say the executables are unsigned and link to
+   [ANTIVIRUS.md](ANTIVIRUS.md).
+4. Publish the draft.
+
+## Code signing
+
+The executables are not signed yet. When signing is added, sign both
+executables in the workflow before packaging, then hash the signed ZIP. Keep
+certificates, keys and passwords out of the repository and out of ordinary CI
+variables; [ANTIVIRUS.md](ANTIVIRUS.md#what-actually-fixes-it) lists the
+options being considered.
+
+Never commit executables, ZIP files or signing material to the repository.

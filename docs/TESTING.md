@@ -2,96 +2,100 @@
 
 ## Automated checks
 
-Configure, build, and run the tests from a Visual Studio developer shell:
+From a Visual Studio developer shell:
 
 ```powershell
 cmake --preset windows-x64
-cmake --build --preset debug --parallel
+cmake --build --preset debug
 ctest --preset debug
 
-cmake --build --preset release --parallel
+cmake --build --preset release
 ctest --preset release
 ```
 
-`abyss_core_tests` currently verifies:
+`abyss_core_tests` covers the platform-independent logic in `src/core.cpp`:
 
-- every supported delay value is accepted;
-- unsupported and unsafe delay values fall back to three seconds;
-- settings normalization preserves the enabled state;
-- the notification-area menu anchor moves exactly eight pixels upward;
-- startup commands quote paths containing spaces; and
-- empty paths or paths containing quotes are rejected.
+- every delay in the menu is accepted, and unknown delays fall back to three
+  seconds without changing the enabled state;
+- the menu anchor moves exactly eight pixels up, including on monitors with
+  negative coordinates;
+- process IDs are parsed strictly (no empty, zero, non-numeric or oversized
+  values);
+- Start with Windows and watchdog command lines quote the executable path and
+  reject paths that contain a quote; and
+- Task Manager's Startup apps flag is read correctly (odd first byte means off).
 
-The Windows CI workflow treats compiler warnings as errors, builds x64 Debug and
-Release-compatible source, runs the Release tests, and creates an unsigned ZIP
-artifact.
+GitHub Actions builds Debug and Release with the same presets, treats compiler
+warnings as errors, runs the tests in both configurations and uploads the
+unsigned Release ZIP. MSVC `/analyze` also reports no warnings for the sources
+(last run 2026-10-21).
 
-During reconstruction, both configurations were built locally, both test runs
-passed, and MSVC `/analyze` completed without diagnostics. A half-second runtime
-smoke test also verified that the main process starts and that the recovery
-watchdog responds to forced termination. That smoke test intentionally ends
-before the minimum one-second hide delay and does not replace the manual cursor
-checks below.
+## Manual checklist
 
-The maintainer subsequently confirmed that the reconstructed application behaves
-the same as the historical v4.17 build during interactive use. The broader
-compatibility and release checklist remains below for future production releases.
+Last full run: 2026-10-21, v5.0.0 Release build, Windows 11 Home (build 26300),
+three monitors at 150%, 125% and 100% scaling. A small helper drew the system
+arrow cursor into a bitmap to tell "hidden" from "visible" without moving the
+mouse. Unchecked items were not tested in that run.
 
-## Manual behavior checklist
+### Hiding and restoring
 
-Run these checks on a disposable Windows user profile or virtual machine before
-publishing a release. Keep `RestoreCursor.exe` beside the main executable.
-
-### Cursor behavior
-
-- [ ] Cursor hides after every selectable delay.
-- [ ] Movement restores the cursor immediately.
-- [ ] Left, right, middle, X1, and X2 button presses restore it.
-- [ ] Wheel and horizontal-wheel input restore it.
+- [x] Hides after the selected delay (checked with 1 and 3 seconds).
+- [x] Movement restores the pointer (within 150 ms).
+- [x] Left, right, middle, back and forward buttons restore it.
+- [x] Wheel and horizontal-wheel input restore it.
+- [x] **Hide Now** hides at once and stays hidden until the mouse is used, with
+      auto-hide on and with auto-hide paused.
+- [x] Pausing auto-hide stops automatic hiding.
 - [ ] Movement and clicks over an elevated Task Manager restore it.
-- [ ] **Hide Now** hides without waiting for the delay.
-- [ ] Pausing restores the cursor and prevents subsequent hiding.
-- [ ] Resuming restarts a complete delay interval.
+- [ ] Resuming auto-hide waits a full delay before hiding.
 
-### Menu and persistence
+### Menu and settings
 
-- [ ] Tray icon and tooltip reflect enabled/paused state and selected delay.
-- [ ] Enabled, delay, and startup changes reopen at the identical anchor.
-- [ ] Menu opens upward and eight pixels above the notification-area anchor.
-- [ ] Enabled state and delay survive an ordinary restart.
-- [ ] Startup checkmark matches the actual current-user `Run` value.
-- [ ] Moving the executable and re-enabling startup updates the path.
+- [x] Menu items and checkmarks match the saved settings.
+- [x] Changing the delay, auto-hide or Start with Windows reopens the menu at
+      the same spot.
+- [x] The menu opens upward from the click.
+- [x] The tooltip shows the delay (`Abyss Cursor Hide: hides after 3 s`).
+- [x] The delay and enabled state survive a restart of the app.
+- [x] Start with Windows writes the quoted path of the running executable, and
+      moving the executable then turning it on again updates the path.
+- [x] With Task Manager's Startup apps switch off, the menu shows Start with
+      Windows as off, and turning it on clears Task Manager's flag.
+- [ ] The app really starts at the next sign-in.
 
 ### Recovery
 
-- [ ] Normal exit restores the cursor scheme.
-- [ ] Ending the main process in Task Manager triggers watchdog restoration.
-- [ ] Manual `RestoreCursor.exe` restores the scheme and reports success.
-- [ ] Windows sign-out/shutdown does not leave an altered cursor scheme.
-- [ ] Lock/unlock and a UAC secure-desktop transition restore the cursor and
-      restart a complete delay interval.
-- [ ] Running without `RestoreCursor.exe`, then ending the interactive main
-      process, triggers restoration through the main executable's self-watchdog.
+- [x] **Exit** restores the pointer and ends both processes.
+- [x] `taskkill /F` on the app while the pointer is hidden: the watchdog
+      restores it within half a second and exits.
+- [x] Killing the app and its watchdog together, then starting the app again,
+      restores the pointer.
+- [x] `RestoreCursor.exe` restores a hidden pointer without the mouse moving.
+- [ ] Lock and unlock, and a UAC prompt, restore the pointer.
+- [ ] Sign-out and shutdown leave the normal cursor scheme.
 
-### Compatibility
+### Shell and display
 
-- [ ] Windows 10 x64 at 100%, 150%, and 200% display scaling.
-- [ ] Windows 11 x64 at 100%, 150%, and 200% display scaling.
-- [ ] Mixed-DPI multi-monitor movement and notification-area placement.
-- [ ] Explorer restart recreates the notification-area icon.
-- [ ] A second launch surfaces the existing instance instead of duplicating it.
-- [ ] Full-screen games and borderless-window applications receive normal input.
+- [x] Restarting Explorer brings the tray icon back.
+- [x] A second launch opens the running copy's menu and exits; the menu closes
+      when you click elsewhere.
+- [x] The menu is sharp on a 150% monitor.
+- [ ] Windows 10.
+- [ ] Changing display scaling while the app runs.
+- [ ] Full-screen games and borderless windows.
+- [ ] Touch and pen input.
 
-## Static release inspection
+## Static release checks
 
-Before release, verify that both executables:
+Before a release, check that both executables:
 
-- are PE32+ x64 GUI applications;
-- contain product, file, and original-filename metadata;
-- embed the requested-execution-level and per-monitor V2 manifest;
-- enable ASLR, NX/DEP, high-entropy VA, Control Flow Guard, and CET compatibility;
-- import no networking libraries;
-- contain no source-machine paths or credentials; and
-- are signed with the intended certificate, if signing is available.
+- are 64-bit Windows GUI programs with the right product name, version,
+  description and copyright in their file properties;
+- embed the manifest (run as the invoking user, per-monitor V2 DPI);
+- have ASLR, high-entropy addresses, DEP, Control Flow Guard and CET
+  compatibility turned on;
+- import no networking libraries; and
+- contain no paths from the build machine.
 
-See [`RELEASING.md`](RELEASING.md) for packaging and checksum steps.
+The v5.0.0 Release build was checked this way on 2026-10-21. See
+[RELEASING.md](RELEASING.md) for the release steps.
