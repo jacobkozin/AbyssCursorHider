@@ -35,4 +35,10 @@ struct ScreenPoint
 // Windows Run-key command.
 [[nodiscard]] std::wstring BuildStartupCommand(std::wstring_view executable_path);
 
+// Builds the command line that starts this executable as the cursor watchdog
+// for the given process: "<path>" --watch <process-id>. Returns an empty string
+// for an unsafe path or a zero process ID.
+[[nodiscard]] std::wstring BuildWatchdogCommand(std::wstring_view executable_path,
+                                                std::uint32_t process_id);
+
 } // namespace abyss

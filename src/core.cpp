@@ -66,4 +66,18 @@ std::wstring BuildStartupCommand(const std::wstring_view executable_path)
     return command;
 }
 
+std::wstring BuildWatchdogCommand(const std::wstring_view executable_path,
+                                  const std::uint32_t process_id)
+{
+    std::wstring command = BuildStartupCommand(executable_path);
+    if (command.empty() || process_id == 0)
+    {
+        return {};
+    }
+
+    command += L" --watch ";
+    command += std::to_wstring(process_id);
+    return command;
+}
+
 } // namespace abyss

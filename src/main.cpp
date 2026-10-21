@@ -49,6 +49,9 @@ LONG WINAPI RestoreAfterUnhandledException(EXCEPTION_POINTERS*) noexcept
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
+// "AbyssCursorHide.exe --watch <pid>" is the watchdog: a second copy of this
+// program that waits for the tray app to exit, however it exits, and then
+// reloads the cursor scheme. It has no window and does nothing else.
 bool TryRunWatchdogMode(int& result) noexcept
 {
     int argument_count = 0;
@@ -109,6 +112,10 @@ class Application final
         {
             return 0;
         }
+
+        // If an earlier copy was killed together with its watchdog while the
+        // pointer was hidden, starting the app again brings the pointer back.
+        (void)abyss::RestoreSystemCursorScheme();
 
         if (!RegisterWindowClass() || !CreateMessageWindow())
         {
@@ -587,33 +594,18 @@ class Application final
         UpdateTrayIcon();
     }
 
+    // In-process cleanup cannot run when the app is killed (Task Manager,
+    // taskkill /F, a crash inside a system DLL), so a second copy of this
+    // executable watches it from outside. See TryRunWatchdogMode.
     void LaunchWatchdog() const
     {
         const std::wstring directory = abyss::CurrentExecutableDirectory();
-        if (directory.empty())
+        const std::wstring command =
+            abyss::BuildWatchdogCommand(executable_path_, GetCurrentProcessId());
+        if (directory.empty() || command.empty())
         {
             return;
         }
-
-        std::wstring watchdog_path = directory + L"\\RestoreCursor.exe";
-        if (GetFileAttributesW(watchdog_path.c_str()) == INVALID_FILE_ATTRIBUTES)
-        {
-            // Retain forced-termination recovery when the main executable was
-            // copied without the packaged manual recovery utility.
-            watchdog_path = executable_path_;
-            if (watchdog_path.empty())
-            {
-                return;
-            }
-        }
-
-        std::wstring command = abyss::BuildStartupCommand(watchdog_path);
-        if (command.empty())
-        {
-            return;
-        }
-        command += L" --watch ";
-        command += std::to_wstring(GetCurrentProcessId());
 
         std::vector<wchar_t> mutable_command(command.begin(), command.end());
         mutable_command.push_back(L'\0');
@@ -621,8 +613,8 @@ class Application final
         STARTUPINFOW startup_info{};
         startup_info.cb = sizeof(startup_info);
         PROCESS_INFORMATION process_info{};
-        if (CreateProcessW(watchdog_path.c_str(), mutable_command.data(), nullptr, nullptr, FALSE,
-                           CREATE_NO_WINDOW, nullptr, directory.c_str(), &startup_info,
+        if (CreateProcessW(executable_path_.c_str(), mutable_command.data(), nullptr, nullptr,
+                           FALSE, 0, nullptr, directory.c_str(), &startup_info,
                            &process_info) != FALSE)
         {
             CloseHandle(process_info.hThread);

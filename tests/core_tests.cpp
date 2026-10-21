@@ -50,6 +50,16 @@ int main()
     Check(abyss::ParseProcessId(L"4294967296") == 0U,
           "process ID larger than a DWORD should be rejected");
 
+    Check(abyss::BuildWatchdogCommand(L"C:\\Program Files\\Abyss\\AbyssCursorHide.exe", 4321) ==
+              L"\"C:\\Program Files\\Abyss\\AbyssCursorHide.exe\" --watch 4321",
+          "watchdog command should quote the path and pass the process ID");
+    Check(abyss::BuildWatchdogCommand(L"C:\\Abyss\\AbyssCursorHide.exe", 0).empty(),
+          "watchdog command should reject a zero process ID");
+    Check(abyss::BuildWatchdogCommand(L"C:\\bad\"path.exe", 4321).empty(),
+          "watchdog command should reject an unsafe path");
+    Check(abyss::ParseProcessId(L"4321") == 4321U,
+          "watchdog process ID should round-trip through the parser");
+
     const abyss::ScreenPoint anchor = abyss::RaiseMenuAnchor({120, 900});
     Check(anchor.x == 120, "menu anchor adjustment should preserve x");
     Check(anchor.y == 892, "menu anchor should move exactly eight pixels upward");
