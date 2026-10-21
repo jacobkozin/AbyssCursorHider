@@ -13,7 +13,7 @@ body:
     attributes:
       label: Application version
       description: Which Abyss Cursor Hide version is affected?
-      placeholder: "5.0.0-dev or commit SHA"
+      placeholder: "5.0.0 or commit SHA"
     validations:
       required: true
   - type: input

@@ -1,14 +1,15 @@
 #include <windows.h>
 #include "resource.h"
+#include "version.h"
 
 IDI_APP_ICON ICON "../abyss_cursor_hide.ico"
 1 RT_MANIFEST "app.manifest"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 5,0,0,0
- PRODUCTVERSION 5,0,0,0
+ FILEVERSION ABYSS_VERSION_MAJOR,ABYSS_VERSION_MINOR,ABYSS_VERSION_PATCH,0
+ PRODUCTVERSION ABYSS_VERSION_MAJOR,ABYSS_VERSION_MINOR,ABYSS_VERSION_PATCH,0
  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
- FILEFLAGS VS_FF_PRERELEASE
+ FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
  FILETYPE VFT_APP
  FILESUBTYPE VFT2_UNKNOWN
@@ -17,13 +18,14 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName", "Abyss Cursor Hide\0"
-            VALUE "FileDescription", "Abyss Cursor Hide\0"
-            VALUE "FileVersion", "5.0.0-dev\0"
-            VALUE "InternalName", "AbyssCursorHide\0"
-            VALUE "OriginalFilename", "AbyssCursorHide.exe\0"
-            VALUE "ProductName", "Abyss Cursor Hide\0"
-            VALUE "ProductVersion", "5.0.0-dev\0"
+            VALUE "CompanyName", "Jacob Kozin"
+            VALUE "FileDescription", "Abyss Cursor Hide"
+            VALUE "FileVersion", ABYSS_VERSION_STRING
+            VALUE "InternalName", "AbyssCursorHide"
+            VALUE "LegalCopyright", "Copyright (c) 2026 Jacob Kozin. MIT License."
+            VALUE "OriginalFilename", "AbyssCursorHide.exe"
+            VALUE "ProductName", "Abyss Cursor Hide"
+            VALUE "ProductVersion", ABYSS_VERSION_STRING
         END
     END
     BLOCK "VarFileInfo"

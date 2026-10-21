@@ -30,19 +30,29 @@ target_compile_definitions(abyss_core PUBLIC
 )
 target_link_libraries(abyss_core PUBLIC advapi32 user32)
 
+# The version in project() above is the only place the version number is
+# written; both .rc files read it from this generated header.
+configure_file(resources/version.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/version.h" @ONLY)
+
 add_executable(AbyssCursorHide WIN32
     src/main.cpp
     resources/app.rc
 )
-target_include_directories(AbyssCursorHide PRIVATE resources)
+target_include_directories(AbyssCursorHide PRIVATE
+    resources
+    "${CMAKE_CURRENT_BINARY_DIR}/generated"
+)
 target_link_libraries(AbyssCursorHide PRIVATE abyss_core shell32 wtsapi32)
 
 add_executable(RestoreCursor WIN32
     src/restore_cursor.cpp
     resources/restore.rc
 )
-target_include_directories(RestoreCursor PRIVATE resources)
-target_link_libraries(RestoreCursor PRIVATE abyss_core shell32)
+target_include_directories(RestoreCursor PRIVATE
+    resources
+    "${CMAKE_CURRENT_BINARY_DIR}/generated"
+)
+target_link_libraries(RestoreCursor PRIVATE abyss_core)
 
 foreach(target abyss_core AbyssCursorHide RestoreCursor)
     if(MSVC)
@@ -91,20 +101,14 @@ if(ABYSS_BUILD_TESTS)
     add_test(NAME abyss_core_tests COMMAND abyss_core_tests)
 endif()
 
+# The release ZIP holds what someone running the app needs; the rest of the
+# documentation stays in the repository.
 install(TARGETS AbyssCursorHide RestoreCursor RUNTIME DESTINATION .)
-install(FILES abyss_cursor_hide.ico README.md LICENSE SECURITY.md DESTINATION .)
-install(FILES
-    docs/ARCHITECTURE.md
-    docs/HISTORY.md
-    docs/RELEASING.md
-    docs/TESTING.md
-    DESTINATION docs
-)
-install(FILES checksums/SHA256SUMS-v4.17.txt DESTINATION checksums)
+install(FILES README.md LICENSE DESTINATION .)
 
 set(CPACK_GENERATOR ZIP)
 set(CPACK_PACKAGE_NAME "AbyssCursorHide")
-set(CPACK_PACKAGE_VENDOR "Abyss Cursor Hide")
+set(CPACK_PACKAGE_VENDOR "Jacob Kozin")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_FILE_NAME "AbyssCursorHide-${PROJECT_VERSION}-windows-x64")
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)

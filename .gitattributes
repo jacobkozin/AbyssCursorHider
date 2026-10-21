@@ -10,6 +10,7 @@ LICENSE text eol=lf
 *.cpp text eol=lf
 *.h text eol=lf
 *.hpp text eol=lf
+*.in text eol=lf
 *.json text eol=lf
 *.manifest text eol=lf
 *.md text eol=lf
@@ -19,5 +20,6 @@ LICENSE text eol=lf
 *.yaml text eol=lf
 
 *.ico binary
+*.png binary
 *.exe binary
 *.zip binary

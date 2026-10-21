@@ -3,6 +3,7 @@ name: Build and test
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -16,32 +17,79 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        configuration: [Debug, Release]
+        preset: [debug, release]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The same preset commands as the README. The preset picks whichever
+      # Visual Studio the runner has installed.
+      - name: Configure
+        run: cmake --preset windows-x64
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }} --parallel
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
+
+      - name: Package
+        if: matrix.preset == 'release'
+        run: cmake --build --preset package
+
+      - name: Upload unsigned package
+        if: matrix.preset == 'release'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: AbyssCursorHide-windows-x64-unsigned
+          path: build/windows-x64/AbyssCursorHide-*-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # Pushing a tag such as v5.0.0 builds the ZIP again from that tag and opens a
+  # draft GitHub Release with the ZIP and its SHA-256. Nothing is published
+  # until the draft is reviewed and published by hand.
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: windows-x64
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
 
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure
-        # Let CMake select the Visual Studio version installed on the hosted
-        # runner. The local developer preset intentionally remains on VS 2022.
-        run: cmake -S . -B build/windows-x64 -A x64 -DABYSS_BUILD_TESTS=ON
+        run: cmake --preset windows-x64
 
       - name: Build
-        run: cmake --build build/windows-x64 --config ${{ matrix.configuration }}
+        run: cmake --build --preset release --parallel
 
       - name: Test
-        run: ctest --test-dir build/windows-x64 -C ${{ matrix.configuration }} --output-on-failure
+        run: ctest --preset release
 
       - name: Package
-        if: matrix.configuration == 'Release'
-        run: cmake --build build/windows-x64 --config Release --target package
+        run: cmake --build --preset package
 
-      - name: Upload unsigned package
-        if: matrix.configuration == 'Release'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: AbyssCursorHide-windows-x64-unsigned
-          path: build/windows-x64/AbyssCursorHide-*-windows-x64.zip
-          if-no-files-found: error
-          retention-days: 14
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          $zip = Get-Item "build/windows-x64/AbyssCursorHide-*-windows-x64.zip"
+          $hash = (Get-FileHash $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($zip.Name)" | Set-Content -Encoding ascii build/windows-x64/SHA256SUMS.txt
+
+          # Release notes are this version's section of CHANGELOG.md.
+          $version = $env:TAG.TrimStart('v')
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $pattern = "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n(.*?)(?=^## \[|\z)"
+          $section = [regex]::Match($changelog, $pattern)
+          if (-not $section.Success) { throw "CHANGELOG.md has no section for $version" }
+          $section.Groups[1].Value.Trim() | Set-Content -Encoding utf8 release-notes.md
+
+          gh release create $env:TAG $zip.FullName build/windows-x64/SHA256SUMS.txt `
+            --draft --verify-tag --title "Abyss Cursor Hide $env:TAG" --notes-file release-notes.md

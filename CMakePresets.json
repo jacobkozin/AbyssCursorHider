@@ -9,7 +9,7 @@
     {
       "name": "windows-x64",
       "displayName": "Windows x64",
-      "generator": "Visual Studio 17 2022",
+      "description": "Uses the newest installed Visual Studio (2022 or later).",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/windows-x64",
       "cacheVariables": {
@@ -27,6 +27,12 @@
       "name": "release",
       "configurePreset": "windows-x64",
       "configuration": "Release"
+    },
+    {
+      "name": "package",
+      "configurePreset": "windows-x64",
+      "configuration": "Release",
+      "targets": ["package"]
     }
   ],
   "testPresets": [
