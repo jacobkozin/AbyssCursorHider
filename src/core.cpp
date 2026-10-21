@@ -80,4 +80,9 @@ std::wstring BuildWatchdogCommand(const std::wstring_view executable_path,
     return command;
 }
 
+bool IsStartupApprovalDisabled(const std::uint8_t* const data, const std::size_t size) noexcept
+{
+    return data != nullptr && size > 0 && (data[0] & 0x01U) != 0;
+}
+
 } // namespace abyss

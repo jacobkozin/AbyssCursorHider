@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -40,5 +41,9 @@ struct ScreenPoint
 // for an unsafe path or a zero process ID.
 [[nodiscard]] std::wstring BuildWatchdogCommand(std::wstring_view executable_path,
                                                 std::uint32_t process_id);
+
+// Task Manager's Startup apps page stores its on/off switch as a REG_BINARY
+// value whose first byte is odd when the user turned the entry off.
+[[nodiscard]] bool IsStartupApprovalDisabled(const std::uint8_t* data, std::size_t size) noexcept;
 
 } // namespace abyss

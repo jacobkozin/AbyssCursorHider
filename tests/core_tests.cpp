@@ -60,6 +60,22 @@ int main()
     Check(abyss::ParseProcessId(L"4321") == 4321U,
           "watchdog process ID should round-trip through the parser");
 
+    const std::uint8_t enabled_by_default[] = {0x02, 0x00, 0x00, 0x00};
+    const std::uint8_t disabled_in_task_manager[] = {0x03, 0x00, 0x00, 0x00};
+    const std::uint8_t enabled_alternate[] = {0x06, 0x00, 0x00, 0x00};
+    const std::uint8_t disabled_alternate[] = {0x07, 0x00, 0x00, 0x00};
+    Check(!abyss::IsStartupApprovalDisabled(enabled_by_default, sizeof(enabled_by_default)),
+          "an even StartupApproved flag should mean enabled");
+    Check(abyss::IsStartupApprovalDisabled(disabled_in_task_manager,
+                                           sizeof(disabled_in_task_manager)),
+          "an odd StartupApproved flag should mean disabled");
+    Check(!abyss::IsStartupApprovalDisabled(enabled_alternate, sizeof(enabled_alternate)),
+          "flag 0x06 should mean enabled");
+    Check(abyss::IsStartupApprovalDisabled(disabled_alternate, sizeof(disabled_alternate)),
+          "flag 0x07 should mean disabled");
+    Check(!abyss::IsStartupApprovalDisabled(nullptr, 0),
+          "a missing StartupApproved value should not block startup");
+
     const abyss::ScreenPoint anchor = abyss::RaiseMenuAnchor({120, 900});
     Check(anchor.x == 120, "menu anchor adjustment should preserve x");
     Check(anchor.y == 892, "menu anchor should move exactly eight pixels upward");

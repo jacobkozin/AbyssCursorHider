@@ -12,6 +12,8 @@ namespace
 
 constexpr wchar_t kSettingsKey[] = L"Software\\AbyssCursorHide";
 constexpr wchar_t kRunKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+constexpr wchar_t kStartupApprovedKey[] =
+    L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 constexpr wchar_t kRunValueName[] = L"AbyssCursorHide";
 
 bool ReadDword(const wchar_t* value_name, DWORD& value) noexcept
@@ -25,6 +27,27 @@ bool WriteDword(HKEY key, const wchar_t* value_name, const DWORD value) noexcept
 {
     return RegSetValueExW(key, value_name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value),
                           sizeof(value)) == ERROR_SUCCESS;
+}
+
+// Task Manager's Startup apps switch leaves the Run value in place and records
+// "off" in a separate StartupApproved value, so both have to be checked.
+bool IsTurnedOffInTaskManager() noexcept
+{
+    BYTE data[64]{};
+    DWORD size = sizeof(data);
+    if (RegGetValueW(HKEY_CURRENT_USER, kStartupApprovedKey, kRunValueName, RRF_RT_REG_BINARY,
+                     nullptr, data, &size) != ERROR_SUCCESS)
+    {
+        return false;
+    }
+    return IsStartupApprovalDisabled(data, size);
+}
+
+bool DeleteValue(const wchar_t* key, const wchar_t* value_name) noexcept
+{
+    const LSTATUS removed = RegDeleteKeyValueW(HKEY_CURRENT_USER, key, value_name);
+    return removed == ERROR_SUCCESS || removed == ERROR_FILE_NOT_FOUND ||
+           removed == ERROR_PATH_NOT_FOUND;
 }
 
 } // namespace
@@ -93,8 +116,10 @@ bool StartupRegistration::IsEnabled() const noexcept
         return false;
     }
 
-    return CompareStringOrdinal(value.data(), -1, command_.c_str(), -1, TRUE) == CSTR_EQUAL ||
-           CompareStringOrdinal(value.data(), -1, executable_path_.c_str(), -1, TRUE) == CSTR_EQUAL;
+    const bool points_here =
+        CompareStringOrdinal(value.data(), -1, command_.c_str(), -1, TRUE) == CSTR_EQUAL ||
+        CompareStringOrdinal(value.data(), -1, executable_path_.c_str(), -1, TRUE) == CSTR_EQUAL;
+    return points_here && !IsTurnedOffInTaskManager();
 }
 
 bool StartupRegistration::SetEnabled(const bool enabled) const noexcept
@@ -120,12 +145,13 @@ bool StartupRegistration::SetEnabled(const bool enabled) const noexcept
             RegSetValueExW(key, kRunValueName, 0, REG_SZ,
                            reinterpret_cast<const BYTE*>(command_.c_str()), bytes) == ERROR_SUCCESS;
         RegCloseKey(key);
-        return saved;
+
+        // Turning it on from the tray menu should win over an older "off" from
+        // Task Manager, otherwise Windows would keep skipping the entry.
+        return saved && DeleteValue(kStartupApprovedKey, kRunValueName);
     }
 
-    const LSTATUS removed = RegDeleteKeyValueW(HKEY_CURRENT_USER, kRunKey, kRunValueName);
-    return removed == ERROR_SUCCESS || removed == ERROR_FILE_NOT_FOUND ||
-           removed == ERROR_PATH_NOT_FOUND;
+    return DeleteValue(kRunKey, kRunValueName) && DeleteValue(kStartupApprovedKey, kRunValueName);
 }
 
 std::wstring CurrentExecutablePath()

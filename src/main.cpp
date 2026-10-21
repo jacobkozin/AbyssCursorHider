@@ -215,6 +215,12 @@ class Application final
         const HWND existing = FindWindowW(kWindowClassName, kWindowTitle);
         if (existing != nullptr)
         {
+            // This copy was just started by the user, so it may pass on the
+            // right to take the foreground. Without that, the running copy's
+            // menu would not close when the user clicks somewhere else.
+            DWORD existing_process_id = 0;
+            GetWindowThreadProcessId(existing, &existing_process_id);
+            AllowSetForegroundWindow(existing_process_id);
             PostMessageW(existing, kMessageShowMenu, 0, 0);
         }
         CloseHandle(mutex_);
@@ -292,9 +298,16 @@ class Application final
 
     void FormatTooltip() noexcept
     {
-        const wchar_t* state = settings_.enabled ? L"Enabled" : L"Paused";
-        StringCchPrintfW(tray_data_.szTip, ARRAYSIZE(tray_data_.szTip),
-                         L"Abyss Cursor Hide - %s - %u s", state, settings_.delay_seconds);
+        if (settings_.enabled)
+        {
+            StringCchPrintfW(tray_data_.szTip, ARRAYSIZE(tray_data_.szTip),
+                             L"Abyss Cursor Hide: hides after %u s", settings_.delay_seconds);
+        }
+        else
+        {
+            StringCchCopyW(tray_data_.szTip, ARRAYSIZE(tray_data_.szTip),
+                           L"Abyss Cursor Hide: paused");
+        }
     }
 
     void UpdateTrayIcon() noexcept
@@ -420,9 +433,10 @@ class Application final
             return;
         }
 
+        // Paused only stops automatic hiding. A pointer hidden with Hide Now
+        // stays hidden until the mouse is used, like any other hide.
         if (!settings_.enabled)
         {
-            (void)cursor_.Restore();
             return;
         }
 
@@ -546,6 +560,10 @@ class Application final
 
         if (command == kCommandHideNow)
         {
+            // Take a fresh polling baseline first. Otherwise the click that
+            // chose Hide Now still reads as "pressed since the last poll" and
+            // the next timer tick would bring the pointer straight back.
+            InitializeFallbackInputState();
             last_activity_tick_ = GetTickCount64();
             if (!cursor_.Hide())
             {
