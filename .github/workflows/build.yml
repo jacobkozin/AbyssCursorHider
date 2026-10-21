@@ -3,9 +3,10 @@ name: Build and test
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -47,11 +48,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Pushing a tag such as v5.0.0 builds the ZIP again from that tag and opens a
-  # draft GitHub Release with the ZIP and its SHA-256. Nothing is published
-  # until the draft is reviewed and published by hand.
-  draft-release:
-    if: startsWith(github.ref, 'refs/tags/v')
+  # Publishing a GitHub Release (made by hand, for a tag such as v5.0.0) builds
+  # that tag again and attaches the ZIP and its SHA-256 to the release.
+  release-assets:
+    if: github.event_name == 'release'
     needs: windows-x64
     runs-on: windows-latest
     timeout-minutes: 15
@@ -74,22 +74,15 @@ jobs:
       - name: Package
         run: cmake --build --preset package
 
-      - name: Create draft release
+      - name: Attach the ZIP and its SHA-256
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          $zip = Get-Item "build/windows-x64/AbyssCursorHide-*-windows-x64.zip"
+          # The ZIP name comes from the version in CMakeLists.txt, so this also
+          # catches a tag that does not match the project version.
+          $expected = "AbyssCursorHide-$($env:TAG.TrimStart('v'))-windows-x64.zip"
+          $zip = Get-Item "build/windows-x64/$expected"
           $hash = (Get-FileHash $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($zip.Name)" | Set-Content -Encoding ascii build/windows-x64/SHA256SUMS.txt
-
-          # Release notes are this version's section of CHANGELOG.md.
-          $version = $env:TAG.TrimStart('v')
-          $changelog = Get-Content CHANGELOG.md -Raw
-          $pattern = "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n(.*?)(?=^## \[|\z)"
-          $section = [regex]::Match($changelog, $pattern)
-          if (-not $section.Success) { throw "CHANGELOG.md has no section for $version" }
-          $section.Groups[1].Value.Trim() | Set-Content -Encoding utf8 release-notes.md
-
-          gh release create $env:TAG $zip.FullName build/windows-x64/SHA256SUMS.txt `
-            --draft --verify-tag --title "Abyss Cursor Hide $env:TAG" --notes-file release-notes.md
+          gh release upload $env:TAG $zip.FullName build/windows-x64/SHA256SUMS.txt --clobber

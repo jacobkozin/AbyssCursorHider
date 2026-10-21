@@ -34,8 +34,8 @@ app, whose source was lost.
 ### Build and release
 
 - CMake presets for Visual Studio 2022 or newer. GitHub Actions builds and tests
-  Debug and Release on every change and drafts a release, with the ZIP and its
-  SHA-256, for each version tag.
+  Debug and Release on every change, and attaches the ZIP and its SHA-256 to
+  each published release.
 - Warnings as errors, SDL checks, ASLR, DEP, Control Flow Guard and CET
   compatibility. MSVC `/analyze` reports no warnings.
 

@@ -83,7 +83,7 @@ release to point to.
   Get-FileHash .\AbyssCursorHide-5.0.0-windows-x64.zip -Algorithm SHA256
   ```
 
-- The release ZIP is built by the `draft-release` job in
+- The release ZIP is built by the `release-assets` job in
   [GitHub Actions](https://github.com/jacobkozin/AbyssCursorHider/actions/workflows/build.yml)
   from the tagged commit, so its build log shows exactly what went into it.
 - You can upload the ZIP to [VirusTotal](https://www.virustotal.com/) for a

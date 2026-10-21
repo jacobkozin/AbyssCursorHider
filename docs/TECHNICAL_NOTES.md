@@ -25,7 +25,7 @@ The distinction matters:
 | Persistence | Current-user registry settings and optional Run entry |
 | Build | CMake presets, MSVC (Visual Studio 2022 or newer), warnings as errors |
 | Recovery | In-process cleanup, a watchdog copy of the app (`--watch <pid>`), restore at startup, and a manual utility |
-| CI | Debug and Release builds and tests, the package artifact, and a draft release for version tags |
+| CI | Debug and Release builds and tests, the package artifact, and the release ZIP and SHA-256 for each published release |
 
 No environment variables, networking libraries, third-party packages, database,
 log, service, driver, or elevated process are required.

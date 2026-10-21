@@ -101,8 +101,8 @@ cmake --build --preset package   # optional: builds the release ZIP
 
 The programs are written to `build/windows-x64/Release/`. GitHub Actions runs
 the same presets for Debug and Release on every push to `main` and every pull
-request. Pushing a version tag also builds the ZIP and opens a draft GitHub
-Release with its SHA-256 checksum.
+request. Publishing a GitHub Release makes it build that tag again and attach
+the ZIP and its SHA-256 checksum to the release.
 
 Builds treat warnings as errors and turn on SDL checks, ASLR, DEP, Control Flow
 Guard and CET compatibility.
