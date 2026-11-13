@@ -116,9 +116,11 @@ bool StartupRegistration::IsEnabled() const noexcept
         return false;
     }
 
+    // Only the quoted command this app writes counts. An unquoted path with
+    // spaces could make Windows start a different program at sign-in, so an
+    // old or hand-made entry shows as off and is rewritten when turned on.
     const bool points_here =
-        CompareStringOrdinal(value.data(), -1, command_.c_str(), -1, TRUE) == CSTR_EQUAL ||
-        CompareStringOrdinal(value.data(), -1, executable_path_.c_str(), -1, TRUE) == CSTR_EQUAL;
+        CompareStringOrdinal(value.data(), -1, command_.c_str(), -1, TRUE) == CSTR_EQUAL;
     return points_here && !IsTurnedOffInTaskManager();
 }
 

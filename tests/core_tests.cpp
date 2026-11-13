@@ -60,6 +60,28 @@ int main()
     Check(abyss::ParseProcessId(L"4321") == 4321U,
           "watchdog process ID should round-trip through the parser");
 
+    std::uint32_t parsed = 7;
+    Check(abyss::ParseUnsignedDecimal(L"0", parsed) && parsed == 0U, "zero should parse as a number");
+    Check(abyss::ParseUnsignedDecimal(L"65535", parsed) && parsed == 65535U,
+          "a role mask should parse");
+    Check(abyss::ParseUnsignedDecimal(L"4294967295", parsed) && parsed == 4294967295U,
+          "the largest 32-bit value should parse");
+    parsed = 7;
+    Check(!abyss::ParseUnsignedDecimal(L"4294967296", parsed) && parsed == 7U,
+          "a value above 32 bits should be rejected and leave the output alone");
+    Check(!abyss::ParseUnsignedDecimal(L"", parsed), "an empty number should be rejected");
+    Check(!abyss::ParseUnsignedDecimal(L"-1", parsed), "a sign should be rejected");
+    Check(!abyss::ParseUnsignedDecimal(L" 1", parsed), "a space should be rejected");
+    Check(!abyss::ParseUnsignedDecimal(L"0x10", parsed), "hexadecimal should be rejected");
+
+    Check(abyss::BuildRestoreCommand(L"C:\\Program Files\\Abyss\\AbyssCursorHide.exe", 65535) ==
+              L"\"C:\\Program Files\\Abyss\\AbyssCursorHide.exe\" --restore 65535",
+          "restore command should quote the path and pass the roles to check");
+    Check(abyss::BuildRestoreCommand(L"", 65535).empty(),
+          "restore command should reject an empty path");
+    Check(abyss::BuildRestoreCommand(L"C:\\bad\"path.exe", 65535).empty(),
+          "restore command should reject an unsafe path");
+
     const std::uint8_t enabled_by_default[] = {0x02, 0x00, 0x00, 0x00};
     const std::uint8_t disabled_in_task_manager[] = {0x03, 0x00, 0x00, 0x00};
     const std::uint8_t enabled_alternate[] = {0x06, 0x00, 0x00, 0x00};

@@ -30,6 +30,12 @@ struct ScreenPoint
 [[nodiscard]] bool IsAllowedDelay(std::uint32_t seconds) noexcept;
 [[nodiscard]] AppSettings NormalizeSettings(AppSettings settings) noexcept;
 [[nodiscard]] ScreenPoint RaiseMenuAnchor(ScreenPoint point) noexcept;
+
+// Parses a plain decimal number: digits only, no sign or spaces, and no larger
+// than 4294967295. Returns false and leaves `value` alone otherwise.
+[[nodiscard]] bool ParseUnsignedDecimal(std::wstring_view text, std::uint32_t& value) noexcept;
+
+// Like ParseUnsignedDecimal, but returns 0 for anything invalid, including 0.
 [[nodiscard]] std::uint32_t ParseProcessId(std::wstring_view text) noexcept;
 
 // Returns an empty string when the path cannot be represented safely as a
@@ -41,6 +47,12 @@ struct ScreenPoint
 // for an unsafe path or a zero process ID.
 [[nodiscard]] std::wstring BuildWatchdogCommand(std::wstring_view executable_path,
                                                 std::uint32_t process_id);
+
+// Builds the command line that starts this executable to reload the cursor
+// scheme once, check that the given cursor roles are visible again and exit:
+// "<path>" --restore <roles>. Returns an empty string for an unsafe path.
+[[nodiscard]] std::wstring BuildRestoreCommand(std::wstring_view executable_path,
+                                               std::uint32_t roles);
 
 // Task Manager's Startup apps page stores its on/off switch as a REG_BINARY
 // value whose first byte is odd when the user turned the entry off.

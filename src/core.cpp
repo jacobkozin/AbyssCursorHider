@@ -27,28 +27,35 @@ ScreenPoint RaiseMenuAnchor(ScreenPoint point) noexcept
     return point;
 }
 
-std::uint32_t ParseProcessId(const std::wstring_view text) noexcept
+bool ParseUnsignedDecimal(const std::wstring_view text, std::uint32_t& value) noexcept
 {
     if (text.empty())
     {
-        return 0;
+        return false;
     }
 
-    std::uint64_t value = 0;
+    std::uint64_t parsed = 0;
     for (const wchar_t character : text)
     {
         if (character < L'0' || character > L'9')
         {
-            return 0;
+            return false;
         }
-        value = value * 10U + static_cast<std::uint64_t>(character - L'0');
-        if (value > std::numeric_limits<std::uint32_t>::max())
+        parsed = parsed * 10U + static_cast<std::uint64_t>(character - L'0');
+        if (parsed > std::numeric_limits<std::uint32_t>::max())
         {
-            return 0;
+            return false;
         }
     }
 
-    return value == 0 ? 0 : static_cast<std::uint32_t>(value);
+    value = static_cast<std::uint32_t>(parsed);
+    return true;
+}
+
+std::uint32_t ParseProcessId(const std::wstring_view text) noexcept
+{
+    std::uint32_t value = 0;
+    return ParseUnsignedDecimal(text, value) ? value : 0;
 }
 
 std::wstring BuildStartupCommand(const std::wstring_view executable_path)
@@ -77,6 +84,18 @@ std::wstring BuildWatchdogCommand(const std::wstring_view executable_path,
 
     command += L" --watch ";
     command += std::to_wstring(process_id);
+    return command;
+}
+
+std::wstring BuildRestoreCommand(const std::wstring_view executable_path,
+                                 const std::uint32_t roles)
+{
+    std::wstring command = BuildStartupCommand(executable_path);
+    if (!command.empty())
+    {
+        command += L" --restore ";
+        command += std::to_wstring(roles);
+    }
     return command;
 }
 
