@@ -42,6 +42,10 @@
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 120
       }
     },
     {
@@ -50,6 +54,10 @@
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 120
       }
     }
   ]

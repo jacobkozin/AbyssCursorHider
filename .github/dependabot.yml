@@ -4,5 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Wait a week before proposing a new action release, so a bad or
+    # compromised release has time to be noticed and pulled.
+    cooldown:
+      default-days: 7
     labels:
       - dependencies

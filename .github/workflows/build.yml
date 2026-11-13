@@ -2,7 +2,7 @@ name: Build and test
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix-*']
   pull_request:
   workflow_dispatch:
   release:
@@ -14,7 +14,7 @@ permissions:
 jobs:
   windows-x64:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -23,24 +23,30 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      # The same preset commands as the README. The preset picks whichever
-      # Visual Studio the runner has installed.
+      # The same preset commands as the README, plus the tests that change the
+      # system cursors, which only CI builds.
       - name: Configure
-        run: cmake --preset windows-x64
+        run: cmake --preset windows-x64 -DABYSS_SYSTEM_CURSOR_TESTS=ON
 
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }} --parallel
 
       - name: Test
-        run: ctest --preset ${{ matrix.preset }}
+        env:
+          # Hosted runners are thrown away after each job, so the tests that
+          # hide and restore the real system cursors may run here.
+          ABYSS_SYSTEM_CURSOR_TESTS: "1"
+        run: ctest --preset ${{ matrix.preset }} --verbose
 
       - name: Package
         if: matrix.preset == 'release'
         run: cmake --build --preset package
 
       - name: Upload unsigned package
-        if: matrix.preset == 'release'
+        if: matrix.preset == 'release' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: AbyssCursorHide-windows-x64-unsigned
@@ -48,8 +54,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Publishing a GitHub Release (made by hand, for a tag such as v5.0.0) builds
-  # that tag again and attaches the ZIP and its SHA-256 to the release.
+  # Publishing a GitHub Release (made by hand, for a tag such as v5.0.1) builds
+  # that tag again, records where the files came from, and attaches the ZIP
+  # and its SHA-256 to the release.
   release-assets:
     if: github.event_name == 'release'
     needs: windows-x64
@@ -57,10 +64,14 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Configure
         run: cmake --preset windows-x64
@@ -74,6 +85,16 @@ jobs:
       - name: Package
         run: cmake --build --preset package
 
+      # Lets anyone check with `gh attestation verify` that the files were built
+      # by this workflow from this repository.
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            build/windows-x64/AbyssCursorHide-*-windows-x64.zip
+            build/windows-x64/Release/AbyssCursorHide.exe
+            build/windows-x64/Release/RestoreCursor.exe
+
       - name: Attach the ZIP and its SHA-256
         env:
           GH_TOKEN: ${{ github.token }}
@@ -84,5 +105,6 @@ jobs:
           $expected = "AbyssCursorHide-$($env:TAG.TrimStart('v'))-windows-x64.zip"
           $zip = Get-Item "build/windows-x64/$expected"
           $hash = (Get-FileHash $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $($zip.Name)" | Set-Content -Encoding ascii build/windows-x64/SHA256SUMS.txt
+          # A plain LF line ending, so `sha256sum -c` also accepts the file.
+          "$hash  $($zip.Name)`n" | Set-Content -Encoding ascii -NoNewline build/windows-x64/SHA256SUMS.txt
           gh release upload $env:TAG $zip.FullName build/windows-x64/SHA256SUMS.txt --clobber

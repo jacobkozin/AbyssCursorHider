@@ -3,7 +3,7 @@
   <assemblyIdentity
       type="win32"
       name="AbyssCursorHide"
-      version="5.0.0.0"
+      version="5.0.1.0"
       processorArchitecture="amd64" />
   <description>Abyss Cursor Hide</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
