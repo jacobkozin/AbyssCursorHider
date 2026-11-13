@@ -3,7 +3,7 @@
 ## Source status
 
 The repository contains a new implementation of the documented v4.17 behavior,
-released as v5.0.0. It is not recovered original source. The historical v4.17
+first released as v5.0.0 on 2026-10-21. It is not recovered original source. The historical v4.17
 main executable embeds the compilation-unit name `y_v417.c`; that file is not
 present in any supplied archive or searched backup location.
 
@@ -23,12 +23,12 @@ The distinction matters:
 | UI | Notification-area icon and native popup menu |
 | Input | Background Raw Input with redundant 100 ms mouse-state polling |
 | Persistence | Current-user registry settings and optional Run entry |
-| Build | CMake presets, MSVC (Visual Studio 2022 or newer), warnings as errors |
-| Recovery | In-process cleanup, a watchdog copy of the app (`--watch <pid>`), restore at startup, and a manual utility |
-| CI | Debug and Release builds and tests, the package artifact, and the release ZIP and SHA-256 for each published release |
+| Build | CMake presets, MSVC (Visual Studio 2022 or newer), warnings as errors, MSVC code analysis on Debug builds |
+| Recovery | In-process cleanup, a check after every restore with a retry from a fresh process (`--restore <roles>`), a supervised watchdog copy of the app (`--watch <pid>`), a restore at every launch, and a manual utility |
+| CI | Debug and Release builds and tests, tests that hide and restore the runner's real cursors, CodeQL, the package artifact, and the release ZIP, its SHA-256 and a build-provenance attestation for each published release |
 
-No environment variables, networking libraries, third-party packages, database,
-log, service, driver, or elevated process are required.
+The app needs no environment variables, networking libraries, third-party
+packages, database, log, service, driver, or elevated process.
 
 ## Release-build observations
 
@@ -58,10 +58,23 @@ Consequently, the app uses `SetSystemCursor`, matching the behavior of the
 historical implementation. This changes the current user's global system cursor
 resources until `SPI_SETCURSORS` reloads the configured scheme.
 
+`SetSystemCursor` takes ownership of the cursor it is given only when it accepts
+the role. When it rejects one, the caller still owns that cursor and has to
+destroy it. 5.0.0 also replaced two obsolete roles, `OCR_SIZE` and `OCR_ICON`,
+and leaked cursors on every hide (Windows 11 rejects `OCR_SIZE`), until the app
+reached the Windows limit of 10,000 USER objects per process.
+
+`SPI_SETCURSORS` loads the scheme's cursor files inside the calling process.
+When that process cannot create more cursors, or a file cannot be loaded, the
+affected roles can stay transparent even though the call reports success. The
+app therefore reads every role back after a restore, and when one is still
+transparent it reloads the scheme from a fresh process
+(`AbyssCursorHide.exe --restore`).
+
 That API choice creates the project's most important failure mode: abrupt process
 termination while hidden can otherwise leave transparent cursor resources
-active. The watchdog process, the restore at startup and the manual restoration
-utility specifically mitigate that risk.
+active. The watchdog process, the restore at every launch and the manual
+restoration utility specifically mitigate that risk.
 
 ## Historical binary observations
 

@@ -37,6 +37,7 @@ linking, modular code, tests, metadata, and CI.
 | Version | Change |
 | --- | --- |
 | 5.0.0 (2026-10-21) | First release built from source: a clean rebuild with unit tests, CI and documentation. Final testing moved the watchdog into the main program and fixed Hide Now and Start with Windows bugs. See [`../CHANGELOG.md`](../CHANGELOG.md). |
+| 5.0.1 (2026-11-13) | Fixed a cursor leak that, after a few days of use, left links and other places without a pointer. Every restore is now checked and retried from a fresh process, the watchdog is supervised, and the tray icon, keyboard menu and pen input work more reliably. DLLs load from System32 only, and CI hides and restores real cursors thousands of times. See [`../CHANGELOG.md`](../CHANGELOG.md). |
 
 ## Verified v4.17 identity
 

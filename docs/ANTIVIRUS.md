@@ -7,7 +7,9 @@ flagged during testing, what was learned from it, and how to check a download
 yourself.
 
 Nothing in the source opens a network connection, downloads anything, or writes
-anywhere except the two registry locations listed in the [README](../README.md#settings).
+anywhere except the registry values listed in the [README](../README.md#settings).
+The only programs it starts are copies of itself: the watchdog and, when a
+restore needs a second try, a short-lived `--restore` helper.
 
 ## What was flagged
 
@@ -72,20 +74,28 @@ so rewriting code until one scanner is happy is not a real fix.
 - **Time.** Reputation systems such as Windows SmartScreen trust a file more as
   more people download it without problems.
 
-v5.0.0 is released unsigned. Signing is the next step once the project has a
-release to point to.
+The releases so far (5.0.0 and 5.0.1) are unsigned. Signing is the next step
+now that the project has releases to point to.
 
 ## Checking a download yourself
 
 - Compare the ZIP's SHA-256 with `SHA256SUMS.txt` on the release page:
 
   ```powershell
-  Get-FileHash .\AbyssCursorHide-5.0.0-windows-x64.zip -Algorithm SHA256
+  Get-FileHash .\AbyssCursorHide-<version>-windows-x64.zip -Algorithm SHA256
   ```
 
 - The release ZIP is built by the `release-assets` job in
   [GitHub Actions](https://github.com/jacobkozin/AbyssCursorHider/actions/workflows/build.yml)
-  from the tagged commit, so its build log shows exactly what went into it.
+  from the tagged commit, so its build log shows exactly what went into it
+  (GitHub keeps those logs for up to 90 days).
+- From 5.0.1 on, the ZIP and both executables also carry a build-provenance
+  attestation, which keeps proving where they were built after the logs are
+  gone:
+
+  ```powershell
+  gh attestation verify .\AbyssCursorHide-<version>-windows-x64.zip --repo jacobkozin/AbyssCursorHider
+  ```
 - You can upload the ZIP to [VirusTotal](https://www.virustotal.com/) for a
   second opinion from many scanners.
 - You can build it yourself; see [Build from source](../README.md#build-from-source).

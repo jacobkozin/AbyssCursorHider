@@ -3,6 +3,61 @@
 Notable changes are recorded here. The v4 entries are reconstructed from the
 verified release notes and development conversation; v4.17 itself is binary-only.
 
+## [5.0.1] - 2026-11-13
+
+### Fixed
+
+- After a few days of use, links and other places could show no pointer at
+  all. Every hide leaked cursors through two obsolete cursor roles (Windows 11
+  rejects `OCR_SIZE`, and a rejected cursor was never destroyed). Once the app
+  reached the Windows limit of 10,000 USER objects per process, reloading the
+  cursor scheme quietly left most cursors, including the link hand,
+  transparent. The app no longer replaces those roles and destroys any cursor
+  Windows does not accept.
+- Starting the app again did not bring the pointer back while another copy was
+  running. Every launch now reloads the cursor scheme first.
+- With Start with Windows on, a busy notification area at sign-in made the app
+  show an error and quit. It now keeps running and retries the tray icon.
+- After a DPI or monitor change, the tray icon could stop updating and stay
+  blurry until sign-out.
+- Pens, tablets, Remote Desktop and virtual machines that keep reporting the
+  same position could stop the pointer from ever hiding.
+- A menu opened from the keyboard, or by a second launch, appeared at the
+  hidden pointer instead of at the tray icon.
+
+### Changed
+
+- Every restore is checked: the app reads each cursor back and, if one is
+  still transparent, starts `AbyssCursorHide.exe --restore`, which reloads the
+  scheme in a fresh process. It retries with a growing delay and does not hide
+  the pointer again until a restore is confirmed.
+- The app only hides the pointer while its watchdog is running, and restarts
+  the watchdog if it exits.
+- It refuses to hide when it is using an unusual number of handles, so a
+  future leak cannot end the way 5.0.0 did.
+- It no longer hides the pointer over the windows of more privileged programs
+  (Task Manager, an admin terminal), where Windows hides clicks and the wheel
+  from it, or while the tray menu is open or a mouse button is held.
+- Only sleep and wake count as power events, not battery level changes.
+- DLLs load from System32 only, so a DLL dropped next to the exe cannot run
+  inside it.
+
+### Build and release
+
+- New tests: `abyss_cursor_tests` checks the cursor code with private cursors,
+  and `abyss_system_cursor_tests`, which runs only on CI, hides and restores
+  the runner's real cursors 2,000 times, checks that the handle counts stay
+  flat, and exercises `--restore` and the watchdog.
+- Debug builds run MSVC `/analyze`, and its warnings fail the build. CodeQL
+  scans the code on every change.
+- Release files come with a build-provenance attestation, so
+  `gh attestation verify` can confirm they were built from this repository.
+
+### Known issues
+
+- The executables are still not code-signed. See
+  [docs/ANTIVIRUS.md](https://github.com/jacobkozin/AbyssCursorHider/blob/main/docs/ANTIVIRUS.md).
+
 ## [5.0.0] - 2026-10-21
 
 The first release built from source. v5 is a clean rebuild of the v4.17 tray

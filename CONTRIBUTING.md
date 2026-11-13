@@ -27,11 +27,15 @@ ctest --preset debug
 
 - Keep the utility native, offline, per-user, and usable without elevation.
 - Preserve reliable cursor restoration on every exit and error path.
-- Treat changes to `SetSystemCursor`, startup registration, or the watchdog as
-  security-sensitive.
+- Treat changes to `SetSystemCursor`, startup registration, the watchdog, or
+  the `--restore` helper as security-sensitive.
 - Add focused tests for validation or platform-independent logic.
-- Build with warnings as errors and run the appropriate manual checks in
-  [`docs/TESTING.md`](docs/TESTING.md).
+- Tests must never change the system cursors of the machine running them. The
+  one exception, `abyss_system_cursor_tests`, is only built with
+  `-DABYSS_SYSTEM_CURSOR_TESTS=ON` and only runs on GitHub Actions with
+  `ABYSS_SYSTEM_CURSOR_TESTS=1`.
+- Build with warnings as errors (Debug builds also run MSVC `/analyze`) and run
+  the appropriate manual checks in [`docs/TESTING.md`](docs/TESTING.md).
 - Update user-facing documentation and `CHANGELOG.md` when behavior changes.
 - Do not commit executables, ZIPs, build folders, registry exports, logs, dumps,
   credentials, certificates, signing material, or machine-specific settings.
