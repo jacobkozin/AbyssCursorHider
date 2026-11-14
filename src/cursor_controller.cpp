@@ -32,10 +32,10 @@ constexpr DWORD kOcrAppStarting = 32650;
 constexpr DWORD kOcrHelp = 32651;
 
 // The obsolete OCR_SIZE (32640) and OCR_ICON (32641) roles are not replaced.
-// In 5.0.0 they leaked cursors on every hide (Windows 11 rejects OCR_SIZE, and
-// a rejected cursor was never destroyed). After a few thousand hides the app
-// ran out of handles, and its scheme reloads then quietly left most cursors,
-// including the link hand, transparent.
+// 5.0.0 replaced them too, and current Windows versions reject OCR_SIZE; the
+// rejected cursor was never destroyed, so every hide leaked one. After a few
+// thousand hides the app ran out of handles, and its scheme reloads then
+// quietly left most cursors, including the link hand, transparent.
 constexpr std::array<CursorTarget, 16> kCursorTargets = {{
     {kOcrNormal, true},
     {kOcrIBeam, true},
@@ -54,6 +54,7 @@ constexpr std::array<CursorTarget, 16> kCursorTargets = {{
     {32671, false}, // OCR_PIN on supported Windows versions.
     {32672, false}, // OCR_PERSON on supported Windows versions.
 }};
+static_assert(kCursorTargets.size() == kCursorRoleCount, "one entry per cursor role");
 static_assert(kAllCursorRoles == (1U << kCursorTargets.size()) - 1U,
               "kAllCursorRoles must have one bit per cursor role");
 
@@ -227,7 +228,48 @@ CursorController::~CursorController()
 {
     if (hidden_)
     {
-        (void)RestoreSystemCursorScheme(expected_roles_);
+        (void)Restore();
+    }
+    ReleaseSavedCursors();
+}
+
+// Reloading the scheme cannot bring back a cursor whose file is missing (a
+// deleted cursor pack, a file on a disconnected drive) or that this process no
+// longer has the handles to load; Windows then keeps the transparent cursor.
+// So Hide keeps a copy of every visible cursor, and this puts the copy back
+// for each role that is still transparent. Windows takes ownership of a copy
+// it accepts, so this needs no new handles. An animated cursor comes back as
+// a still image until the next successful reload.
+void CursorController::PutBackSavedCursors() noexcept
+{
+    const CursorRoleMask visible = VisibleCursorRoles();
+    bool put_back = false;
+    for (std::size_t index = 0; index < kCursorTargets.size(); ++index)
+    {
+        const CursorRoleMask bit = CursorRoleMask{1} << index;
+        HCURSOR& saved = saved_cursors_[index];
+        if (saved != nullptr && (expected_roles_ & bit) != 0 && (visible & bit) == 0 &&
+            SetSystemCursor(saved, kCursorTargets[index].id) != FALSE)
+        {
+            saved = nullptr;
+            put_back = true;
+        }
+    }
+    if (put_back)
+    {
+        SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    }
+}
+
+void CursorController::ReleaseSavedCursors() noexcept
+{
+    for (HCURSOR& saved : saved_cursors_)
+    {
+        if (saved != nullptr)
+        {
+            DestroyCursor(saved);
+            saved = nullptr;
+        }
     }
 }
 
@@ -248,6 +290,16 @@ bool CursorController::Hide() noexcept
     }
 
     expected_roles_ = VisibleCursorRoles();
+    ReleaseSavedCursors();
+    for (std::size_t index = 0; index < kCursorTargets.size(); ++index)
+    {
+        if ((expected_roles_ & (CursorRoleMask{1} << index)) != 0)
+        {
+            const HCURSOR current =
+                LoadCursorW(nullptr, MAKEINTRESOURCEW(kCursorTargets[index].id));
+            saved_cursors_[index] = current != nullptr ? CopyCursor(current) : nullptr;
+        }
+    }
 
     bool all_required_succeeded = true;
     unsigned int success_count = 0;
@@ -266,7 +318,11 @@ bool CursorController::Hide() noexcept
 
     if (!all_required_succeeded || success_count == 0)
     {
-        (void)ReloadSystemCursorScheme();
+        if (!RestoreSystemCursorScheme(expected_roles_))
+        {
+            PutBackSavedCursors();
+        }
+        ReleaseSavedCursors();
         return false;
     }
 
@@ -283,7 +339,14 @@ bool CursorController::Restore() noexcept
     }
 
     hidden_ = false;
-    return RestoreSystemCursorScheme(expected_roles_);
+    bool restored = RestoreSystemCursorScheme(expected_roles_);
+    if (!restored)
+    {
+        PutBackSavedCursors();
+        restored = CursorRolesVisible(expected_roles_);
+    }
+    ReleaseSavedCursors();
+    return restored;
 }
 
 bool CursorController::hidden() const noexcept

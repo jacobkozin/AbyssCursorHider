@@ -79,6 +79,7 @@ struct Role
 };
 
 // The 16 roles the app replaces, plus the two obsolete roles 5.0.0 also used.
+// Current Windows versions reject OCR_SIZE and accept OCR_ICON.
 constexpr std::array<Role, 18> kRoles = {{
     {32512, "NORMAL", true, true},       {32513, "IBEAM", true, true},
     {32514, "WAIT", true, true},         {32515, "CROSS", true, true},
@@ -439,9 +440,12 @@ long long RunRestoreCopy(const std::wstring& application, const abyss::CursorRol
     return exit_code;
 }
 
-// Fills this process's USER object quota, as 5.0.0's leak eventually did, and
-// checks that Restore() reports the failure, that Hide() refuses to run so
-// close to the quota, and that a fresh --restore copy brings everything back.
+// Fills this process's USER object quota, as 5.0.0's leak eventually did. Each
+// round first restores with a plain reload, as the watchdog and the --restore
+// helper do, and then with the controller, which also puts back the copies it
+// kept. Neither may report success while a cursor is still transparent, Hide()
+// must refuse to run so close to the quota, and whatever is still transparent
+// must come back from a fresh --restore copy.
 void QuotaPhase(const std::wstring& application)
 {
     abyss::CursorController controller(GetModuleHandleW(nullptr));
@@ -455,74 +459,85 @@ void QuotaPhase(const std::wstring& application)
 
     for (const std::size_t headroom : kHeadroom)
     {
-        if (!controller.Hide())
+        for (const bool plain_reload : {true, false})
         {
-            Fail("Hide() failed before filling the quota", static_cast<long long>(headroom));
-            ReloadScheme();
-            return;
-        }
-
-        std::vector<HCURSOR> filler;
-        filler.reserve(20000);
-        DWORD fill_error = ERROR_SUCCESS;
-        for (int index = 0; index < 20000; ++index)
-        {
-            const HCURSOR cursor = CreateCursor(nullptr, 0, 0, 16, 16, kAnd.data(), kXor.data());
-            if (cursor == nullptr)
+            if (!controller.Hide())
             {
-                fill_error = GetLastError();
-                break;
+                Fail("Hide() failed before filling the quota", static_cast<long long>(headroom));
+                ReloadScheme();
+                return;
             }
-            filler.push_back(cursor);
-        }
-        for (std::size_t freed = 0; freed < headroom && !filler.empty(); ++freed)
-        {
-            DestroyCursor(filler.back());
-            filler.pop_back();
-        }
 
-        const bool reported = controller.Restore();
-        const AllRoles rendered = RenderTargetRoles(true);
-        std::printf("Quota: %zu fillers (error %lu), headroom %zu: Restore() %s, cursors %s\n",
-                    filler.size(), fill_error, headroom, reported ? "true" : "false",
-                    rendered == AllRoles::visible          ? "all draw"
-                    : rendered == AllRoles::some_invisible ? "SOME TRANSPARENT"
-                                                           : "unknown");
-        if (reported && rendered == AllRoles::some_invisible)
-        {
-            Fail("Restore() reported success while a cursor is still transparent",
-                 static_cast<long long>(headroom));
-        }
-
-        if (controller.Hide())
-        {
-            Fail("Hide() ran with the USER object quota nearly used up",
-                 static_cast<long long>(headroom));
-            (void)controller.Restore();
-        }
-
-        if (rendered == AllRoles::some_invisible)
-        {
-            const long long exit_code = RunRestoreCopy(application, controller.expected_roles());
-            const AllRoles after = RenderTargetRoles(true);
-            std::printf("Quota: --restore copy exited with %lld, cursors %s\n", exit_code,
-                        after == AllRoles::visible ? "all draw" : "NOT ALL DRAW");
-            if (exit_code != 0 || after != AllRoles::visible)
+            std::vector<HCURSOR> filler;
+            filler.reserve(20000);
+            DWORD fill_error = ERROR_SUCCESS;
+            for (int index = 0; index < 20000; ++index)
             {
-                Fail("a fresh --restore copy did not bring the cursors back", exit_code,
+                const HCURSOR cursor =
+                    CreateCursor(nullptr, 0, 0, 16, 16, kAnd.data(), kXor.data());
+                if (cursor == nullptr)
+                {
+                    fill_error = GetLastError();
+                    break;
+                }
+                filler.push_back(cursor);
+            }
+            for (std::size_t freed = 0; freed < headroom && !filler.empty(); ++freed)
+            {
+                DestroyCursor(filler.back());
+                filler.pop_back();
+            }
+
+            const bool reported =
+                plain_reload ? abyss::RestoreSystemCursorScheme(controller.expected_roles())
+                             : controller.Restore();
+            const AllRoles rendered = RenderTargetRoles(true);
+            std::printf("Quota: %zu fillers (error %lu), headroom %zu, %s: %s, cursors %s\n",
+                        filler.size(), fill_error, headroom,
+                        plain_reload ? "plain reload" : "Restore()",
+                        reported ? "reported success" : "reported failure",
+                        rendered == AllRoles::visible          ? "all draw"
+                        : rendered == AllRoles::some_invisible ? "SOME TRANSPARENT"
+                                                               : "unknown");
+            if (reported && rendered == AllRoles::some_invisible)
+            {
+                Fail("a restore reported success while a cursor is still transparent",
+                     static_cast<long long>(headroom), plain_reload ? 1 : 0);
+            }
+
+            if (rendered == AllRoles::some_invisible)
+            {
+                const long long exit_code =
+                    RunRestoreCopy(application, controller.expected_roles());
+                const AllRoles after = RenderTargetRoles(true);
+                std::printf("Quota: --restore copy exited with %lld, cursors %s\n", exit_code,
+                            after == AllRoles::visible ? "all draw" : "NOT ALL DRAW");
+                if (exit_code != 0 || after != AllRoles::visible)
+                {
+                    Fail("a fresh --restore copy did not bring the cursors back", exit_code,
+                         static_cast<long long>(headroom));
+                }
+            }
+
+            // After a plain reload the controller still counts as hidden.
+            (void)controller.Restore();
+            if (controller.Hide())
+            {
+                Fail("Hide() ran with the USER object quota nearly used up",
+                     static_cast<long long>(headroom));
+                (void)controller.Restore();
+            }
+
+            for (const HCURSOR cursor : filler)
+            {
+                DestroyCursor(cursor);
+            }
+            ReloadScheme();
+            if (RenderTargetRoles(true) != AllRoles::visible)
+            {
+                Fail("cursors are still transparent after freeing the quota",
                      static_cast<long long>(headroom));
             }
-        }
-
-        for (const HCURSOR cursor : filler)
-        {
-            DestroyCursor(cursor);
-        }
-        ReloadScheme();
-        if (RenderTargetRoles(true) != AllRoles::visible)
-        {
-            Fail("cursors are still transparent after freeing the quota",
-                 static_cast<long long>(headroom));
         }
     }
 }
@@ -594,8 +609,9 @@ void WatchdogPhase(const std::wstring& application)
 }
 
 // A cursor scheme can point at a file that no longer exists (a deleted cursor
-// pack, a file on a disconnected drive). Restoring must not leave that role
-// transparent.
+// pack, a file on a disconnected drive). Reloading keeps whatever cursor that
+// role had, so a plain reload cannot bring it back; the controller's restore
+// must, from the copy it kept.
 void MissingFilePhase()
 {
     constexpr wchar_t kCursorsKey[] = L"Control Panel\\Cursors";
@@ -632,9 +648,10 @@ void MissingFilePhase()
                 "(Restore() reported %s)\n",
                 before == Rendered::visible ? "draws" : "does not draw",
                 after == Rendered::visible ? "draws" : "DOES NOT DRAW", restored ? "true" : "false");
-    if (after != Rendered::visible)
+    if (after != Rendered::visible || !restored)
     {
-        Fail("a scheme entry pointing at a missing file stayed transparent after restoring");
+        Fail("a scheme entry pointing at a missing file stayed transparent after restoring",
+             restored ? 1 : 0);
     }
 
     if (had_value)

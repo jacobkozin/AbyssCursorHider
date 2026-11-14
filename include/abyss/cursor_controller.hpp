@@ -2,6 +2,8 @@
 
 #include <windows.h>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace abyss
@@ -10,6 +12,7 @@ namespace abyss
 // Bit i stands for the i-th cursor role the app replaces when it hides the
 // pointer (the arrow, text beam, hand and so on; see cursor_controller.cpp).
 using CursorRoleMask = std::uint32_t;
+inline constexpr std::size_t kCursorRoleCount = 16;
 inline constexpr CursorRoleMask kAllCursorRoles = 0xFFFFU;
 
 // Reloads the user's cursor scheme with SPI_SETCURSORS and returns what Windows
@@ -51,10 +54,11 @@ class CursorController final
     // CursorRolesVisible(expected_roles()) tells whether that worked.
     [[nodiscard]] bool Hide() noexcept;
 
-    // Reloads the cursor scheme if this controller hid the pointer. Returns
-    // false when a role that was visible before the hide is still transparent
-    // afterwards; the controller no longer counts as hidden either way, because
-    // repeating the same reload in this process cannot fix that.
+    // Reloads the cursor scheme if this controller hid the pointer, and puts
+    // back the copy Hide kept of any cursor the reload left transparent.
+    // Returns false when a role that was visible before the hide is still
+    // transparent afterwards; the controller no longer counts as hidden either
+    // way, because repeating the same steps in this process cannot fix that.
     [[nodiscard]] bool Restore() noexcept;
     [[nodiscard]] bool hidden() const noexcept;
 
@@ -63,9 +67,14 @@ class CursorController final
     [[nodiscard]] CursorRoleMask expected_roles() const noexcept;
 
   private:
+    void PutBackSavedCursors() noexcept;
+    void ReleaseSavedCursors() noexcept;
+
     HINSTANCE instance_ = nullptr;
     bool hidden_ = false;
     CursorRoleMask expected_roles_ = kAllCursorRoles;
+    // Copies of the cursors that were visible just before the last hide.
+    std::array<HCURSOR, kCursorRoleCount> saved_cursors_{};
 };
 
 // True when every role in `roles` is visible right now.
