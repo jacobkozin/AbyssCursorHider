@@ -8,12 +8,16 @@ verified release notes and development conversation; v4.17 itself is binary-only
 ### Fixed
 
 - After a few days of use, links and other places could show no pointer at
-  all. Every hide leaked cursors through two obsolete cursor roles (Windows 11
-  rejects `OCR_SIZE`, and a rejected cursor was never destroyed). Once the app
-  reached the Windows limit of 10,000 USER objects per process, reloading the
-  cursor scheme quietly left most cursors, including the link hand,
-  transparent. The app no longer replaces those roles and destroys any cursor
-  Windows does not accept.
+  all. Every hide leaked a cursor through the obsolete `OCR_SIZE` role, which
+  current Windows versions reject; the rejected cursor was never destroyed.
+  Once the app reached the Windows limit of 10,000 USER objects per process,
+  reloading the cursor scheme quietly left most cursors, including the link
+  hand, transparent. The app no longer replaces the obsolete roles and
+  destroys any cursor Windows does not accept.
+- If the cursor scheme named a file that no longer exists, such as one from a
+  deleted cursor pack, that pointer stayed invisible after the first hide
+  until you signed out. The app now keeps a copy of each visible cursor while
+  the pointer is hidden and puts it back when reloading the scheme cannot.
 - Starting the app again did not bring the pointer back while another copy was
   running. Every launch now reloads the cursor scheme first.
 - With Start with Windows on, a busy notification area at sign-in made the app
@@ -27,10 +31,11 @@ verified release notes and development conversation; v4.17 itself is binary-only
 
 ### Changed
 
-- Every restore is checked: the app reads each cursor back and, if one is
-  still transparent, starts `AbyssCursorHide.exe --restore`, which reloads the
-  scheme in a fresh process. It retries with a growing delay and does not hide
-  the pointer again until a restore is confirmed.
+- Every restore is checked: the app reads each cursor back and puts back its
+  saved copy of any that is still transparent. If that fails too, it starts
+  `AbyssCursorHide.exe --restore`, which reloads the scheme in a fresh
+  process. It retries with a growing delay and does not hide the pointer again
+  until a restore is confirmed.
 - The app only hides the pointer while its watchdog is running, and restarts
   the watchdog if it exits.
 - It refuses to hide when it is using an unusual number of handles, so a
@@ -47,7 +52,11 @@ verified release notes and development conversation; v4.17 itself is binary-only
 - New tests: `abyss_cursor_tests` checks the cursor code with private cursors,
   and `abyss_system_cursor_tests`, which runs only on CI, hides and restores
   the runner's real cursors 2,000 times, checks that the handle counts stay
-  flat, and exercises `--restore` and the watchdog.
+  flat, and exercises a full handle quota, a missing cursor file, `--restore`
+  and the watchdog.
+- `abyss_binary_tests` checks the security settings of both programs on every
+  build: ASLR, DEP, Control Flow Guard, CET, DLLs from System32 only, no
+  networking imports, the manifest and the version information.
 - Debug builds run MSVC `/analyze`, and its warnings fail the build. CodeQL
   scans the code on every change.
 - Release files come with a build-provenance attestation, so

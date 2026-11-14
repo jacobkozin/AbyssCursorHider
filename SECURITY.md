@@ -39,8 +39,9 @@ exports, crash dumps and unrelated machine information.
 - The hidden cursors are reversed on mouse activity, on lock and session
   changes, on sleep and wake, on exit, sign-out and shutdown, from the crash
   handler, by the watchdog process, when the app starts, and by
-  `RestoreCursor.exe`. Every restore is checked, and a failed one is retried
-  from a fresh process.
+  `RestoreCursor.exe`. Every restore is checked: a cursor that is still
+  transparent gets back the copy kept while the pointer was hidden, and a
+  failed restore is retried from a fresh process.
 - Release builds turn on ASLR, DEP, Control Flow Guard and CET compatibility.
 
 ## Known risk
@@ -50,7 +51,9 @@ If the app and its watchdog were both killed while the pointer was hidden, the
 pointer would stay transparent until it is restored by starting the app again,
 running `RestoreCursor.exe`, or signing out. Crashes that end the process
 without running its crash handler (for example a failed security check) are
-covered by the watchdog alone. The change is never saved to the user's profile,
+covered by the watchdog alone. Those other processes can only reload the
+cursor scheme, so if the scheme names a missing cursor file, that cursor comes
+back only after signing out. The change is never saved to the user's profile,
 so signing out always restores it.
 
 ## Release verification

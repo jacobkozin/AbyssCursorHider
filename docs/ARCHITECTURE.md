@@ -88,22 +88,30 @@ Hiding creates a monochrome transparent cursor at the current cursor size for
 each standard cursor role (arrow, text, busy, hand, resize and so on) and passes
 it to `SetSystemCursor`. Windows takes ownership of a cursor only when it
 accepts the role, so a cursor it rejects is destroyed at once. The obsolete
-`OCR_SIZE` and `OCR_ICON` roles are left alone: replacing them leaked cursors on
-every hide in 5.0.0. If any required role cannot be replaced, the controller
-reloads the cursor scheme at once rather than leaving a half-hidden state.
+`OCR_SIZE` and `OCR_ICON` roles are left alone: Windows rejects `OCR_SIZE`, and
+5.0.0 never destroyed the rejected cursor, so every hide leaked one. If any
+required role cannot be replaced, the controller restores the cursors at once
+rather than leaving a half-hidden state.
 
 Before hiding, the controller refuses if the process is using more than 1,000
 USER or GDI objects. The app normally uses a few dozen, and a process near the
 Windows limit of 10,000 cannot load the cursor files when it restores, which is
 how 5.0.0 left cursors invisible.
 
-Just before hiding it also records which roles are visible. Restoring calls
-`SystemParametersInfo(SPI_SETCURSORS)`, which reloads the user's configured
-cursor scheme, and then reads each of those roles back. Windows loads the
-scheme's cursor files inside the calling process and quietly skips any it
-cannot load while still reporting success, so the read-back is what decides
-whether a restore worked. A role that the user's own scheme leaves blank was
-not visible before the hide, so it does not count as a failure.
+Just before hiding it also records which roles are visible and keeps a copy of
+each of those cursors. Restoring calls `SystemParametersInfo(SPI_SETCURSORS)`,
+which reloads the user's configured cursor scheme, and then reads each of
+those roles back. Windows loads the scheme's cursor files inside the calling
+process and keeps the current cursor of any role whose file it cannot load,
+because the file is missing or the process is short of handles, so the
+read-back is what decides whether a restore worked. A role that the user's own
+scheme leaves blank was not visible before the hide, so it does not count as a
+failure.
+
+For a role that is still transparent after the reload, the controller puts its
+copy back with `SetSystemCursor`. Windows takes ownership of the copy, so this
+needs no new handles and works even in a process short of them. An animated
+cursor comes back as a still image until the next successful reload.
 
 ### `src/windows_settings.cpp`
 
@@ -177,11 +185,16 @@ The pointer is restored through several independent paths:
 9. starting the app again; and
 10. running `RestoreCursor.exe`.
 
-Every restore from paths 1 to 5 is checked. When one leaves a cursor
-transparent, the tray app starts `AbyssCursorHide.exe --restore` with the roles
-to check, waits for its exit code, and tries again after 1, 2, 4 seconds and so
-on up to a minute until one succeeds. Until then it does not hide the pointer
-again.
+Every restore from paths 1 to 5 is checked, and a cursor that is still
+transparent after reloading the scheme gets back the copy saved before hiding.
+When even that leaves a cursor transparent, the tray app starts
+`AbyssCursorHide.exe --restore` with the roles to check, waits for its exit
+code, and tries again after 1, 2, 4 seconds and so on up to a minute until one
+succeeds. Until then it does not hide the pointer again.
+
+The watchdog, `--restore`, a new launch and `RestoreCursor.exe` run in other
+processes and can only reload the scheme. A cursor whose file is missing
+therefore comes back from them only after signing out.
 
 The watchdog is a separate process because nothing inside a process can run
 after that process is killed. The tray app keeps its process handle, starts a

@@ -42,22 +42,32 @@ built with `-DABYSS_SYSTEM_CURSOR_TESTS=ON` and only runs when
 thrown away after each job; anywhere else it reports itself as skipped. It:
 
 - replaces every cursor role three times and checks that none of them leaks a
-  USER object, and reports what Windows does with the two obsolete roles;
+  USER object, and reports what Windows does with the two obsolete roles (it
+  rejects `OCR_SIZE` and accepts `OCR_ICON`);
 - hides and restores 2,000 times, checking that every role is transparent
   while hidden and drawn again afterwards (also by rendering it), and that the
   USER and GDI object counts stay flat;
-- fills the process's USER object quota, as 5.0.0's leak did, and checks that
-  a restore then reports the failure, that hiding is refused, and that a fresh
-  `AbyssCursorHide.exe --restore` brings every cursor back;
+- fills the process's USER object quota, as 5.0.0's leak did. A plain reload of
+  the scheme, which is all the watchdog and `--restore` can do, must report
+  that it left cursors transparent, and a fresh `AbyssCursorHide.exe --restore`
+  must then bring every cursor back. The app's own restore, which also puts
+  back the copies it kept, must bring every cursor back even at the quota.
+  Hiding must be refused either way;
 - starts `AbyssCursorHide.exe --watch` on a stand-in process and checks that it
   waits, then restores the cursors as soon as that process is killed; and
 - points the scheme's hand cursor at a missing file and checks that a hide and
   restore still leave it visible.
 
+`abyss_binary_tests` reads `AbyssCursorHide.exe` and `RestoreCursor.exe`
+without running them and checks the settings listed under
+[Static release checks](#static-release-checks).
+
 GitHub Actions configures, builds and tests Debug and Release with the same
 presets plus the option above, treats compiler warnings as errors, runs MSVC
 `/analyze` on Debug builds (its warnings fail the build too) and uploads the
-unsigned Release ZIP. A separate CodeQL workflow scans the C++ code.
+unsigned Release ZIP. When a test fails, its failed checks and the end of the
+test output also appear on the run's summary page. A separate CodeQL workflow
+scans the C++ code.
 
 ## Manual checklist
 
@@ -131,17 +141,23 @@ GitHub Actions only; the items below still describe the 5.0.0 run.
 
 ## Static release checks
 
-Before a release, check that both executables:
+`abyss_binary_tests` checks both executables on every build, locally and on
+CI:
 
-- are 64-bit Windows GUI programs with the right product name, version,
-  description and copyright in their file properties;
-- embed the manifest (run as the invoking user, per-monitor V2 DPI);
-- have ASLR, high-entropy addresses, DEP, Control Flow Guard and CET
-  compatibility turned on, and load their DLLs from System32 only
-  (`dumpbin /loadconfig` shows a dependent load flag of 0x800, and
-  `dumpbin /imports AbyssCursorHide.exe` lists `WTSAPI32.dll` as delay-loaded);
-- import no networking libraries; and
-- contain no paths from the build machine.
+- they are 64-bit Windows GUI programs with ASLR (keeping their relocations),
+  high-entropy addresses, DEP, Control Flow Guard and CET compatibility, and
+  no section that is both writable and executable;
+- their dependent load flag is 0x800, so their imports load from System32
+  only. Every DLL they import directly is one Windows always loads from
+  System32 (a KnownDLL), `AbyssCursorHide.exe` delay-loads `WTSAPI32.dll`, and
+  neither imports a networking library;
+- the embedded manifest runs them as the invoking user with per-monitor V2 DPI
+  awareness, and its version matches `CMakeLists.txt`;
+- their file properties show the right product name, version, original file
+  name, description, company and copyright; and
+- Release builds name no debug database and contain no path from the build
+  machine.
 
-The v5.0.0 Release build was checked this way on 2026-10-21. See
+Before a release, also look at the file properties and icon of both
+executables. The v5.0.0 Release build was checked by hand on 2026-10-21. See
 [RELEASING.md](RELEASING.md) for the release steps.

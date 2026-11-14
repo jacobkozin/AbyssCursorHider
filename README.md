@@ -68,9 +68,10 @@ cursor hiders generally do. When the delay runs out, it swaps every standard
 system cursor for a transparent one with `SetSystemCursor`. When the mouse is
 used again, it reloads your normal cursor scheme with
 `SystemParametersInfo(SPI_SETCURSORS)` and reads each cursor back to check that
-none is still transparent. Windows loads the scheme inside the program that
-asks for it and can quietly skip cursors there, so if one is still
-transparent, the app starts a fresh copy of itself
+none is still transparent. When Windows cannot load a cursor's file, for
+example one from a deleted cursor pack, it keeps the transparent cursor, so the
+app keeps a copy of each cursor while the pointer is hidden and puts that copy
+back. If even that fails, it starts a fresh copy of itself
 (`AbyssCursorHide.exe --restore`) that reloads the scheme and exits.
 
 It watches the mouse two ways:
@@ -97,7 +98,7 @@ pointer back:
 | You move, click or scroll | Raw Input, or the 100 ms poll |
 | You lock the PC, a UAC prompt appears, or a Remote Desktop session connects or disconnects | Session notifications, and the poll stops hiding while the secure desktop is up |
 | You pause auto-hide, change the delay, or the PC wakes from sleep | The app restores right away |
-| Windows reloads the scheme but a cursor is still transparent | The app checks every cursor after restoring; if one is still transparent it starts `AbyssCursorHide.exe --restore`, which reloads the scheme in a fresh process, and it doesn't hide again until a restore is confirmed |
+| Windows reloads the scheme but a cursor is still transparent, for example because its file is missing | The app checks every cursor after restoring and puts back the copy it kept of any that is still transparent. If that fails, it starts `AbyssCursorHide.exe --restore`, which reloads the scheme in a fresh process, and it doesn't hide again until a restore is confirmed |
 | You choose Exit, sign out or shut down | Normal cleanup, and after Exit the watchdog reloads the scheme once more |
 | The app crashes | Its unhandled-exception handler, then the watchdog |
 | The app's process is killed, for example with `taskkill /F /PID` | The watchdog: a second copy of `AbyssCursorHide.exe`, started with `--watch <pid>`, waits for the app to exit and then reloads the cursor scheme. The app only hides the pointer while the watchdog is running |
@@ -139,7 +140,8 @@ its SHA-256 checksum and a build-provenance attestation.
 
 Builds treat warnings as errors, Debug builds also run MSVC code analysis
 (`/analyze`), and the programs turn on SDL checks, ASLR, DEP, Control Flow
-Guard and CET compatibility and load DLLs from System32 only.
+Guard and CET compatibility and load DLLs from System32 only. A test reads the
+built programs and checks those settings every time.
 
 ## Project layout
 
@@ -152,6 +154,7 @@ src/core.cpp                  Small pure functions shared with the unit tests
 tests/core_tests.cpp          Unit tests for src/core.cpp
 tests/cursor_tests.cpp        Cursor tests that only use private cursors
 tests/system_cursor_tests.cpp CI-only tests that hide and restore the real cursors
+tests/binary_tests.cpp        Checks the security settings of the built programs
 resources/                    Icon, manifest (per-monitor DPI, no admin) and version info
 docs/                         Architecture, testing, releasing, antivirus notes and history
 ```

@@ -60,16 +60,18 @@ resources until `SPI_SETCURSORS` reloads the configured scheme.
 
 `SetSystemCursor` takes ownership of the cursor it is given only when it accepts
 the role. When it rejects one, the caller still owns that cursor and has to
-destroy it. 5.0.0 also replaced two obsolete roles, `OCR_SIZE` and `OCR_ICON`,
-and leaked cursors on every hide (Windows 11 rejects `OCR_SIZE`), until the app
+destroy it. 5.0.0 also replaced two obsolete roles, `OCR_SIZE` and `OCR_ICON`.
+Current Windows versions accept `OCR_ICON` but reject `OCR_SIZE`, and 5.0.0
+never destroyed the rejected cursor, so every hide leaked one until the app
 reached the Windows limit of 10,000 USER objects per process.
 
 `SPI_SETCURSORS` loads the scheme's cursor files inside the calling process.
-When that process cannot create more cursors, or a file cannot be loaded, the
-affected roles can stay transparent even though the call reports success. The
-app therefore reads every role back after a restore, and when one is still
-transparent it reloads the scheme from a fresh process
-(`AbyssCursorHide.exe --restore`).
+When that process cannot create more cursors, or the scheme names a file that
+cannot be loaded, Windows keeps whatever cursor those roles had, which after a
+hide is the transparent one. The app therefore reads every role back after a
+restore instead of trusting the call. For a role that is still transparent it
+puts back a copy of the cursor saved before hiding, and if that fails it
+reloads the scheme from a fresh process (`AbyssCursorHide.exe --restore`).
 
 That API choice creates the project's most important failure mode: abrupt process
 termination while hidden can otherwise leave transparent cursor resources

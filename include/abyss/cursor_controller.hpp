@@ -17,8 +17,9 @@ inline constexpr CursorRoleMask kAllCursorRoles = 0xFFFFU;
 
 // Reloads the user's cursor scheme with SPI_SETCURSORS and returns what Windows
 // reports. Windows loads the scheme's files inside the calling process and
-// quietly skips any it cannot load, for example when that process is out of
-// handles, yet still reports success.
+// keeps the current cursor of any role whose file it cannot load, for example
+// when the file is missing or that process is out of handles, so only reading
+// the cursors back shows whether the reload worked.
 [[nodiscard]] bool ReloadSystemCursorScheme() noexcept;
 
 // Reloads the scheme and reports whether every role in `expected` is visible
