@@ -122,6 +122,25 @@ if(ABYSS_BUILD_TESTS)
     abyss_msvc_options(abyss_cursor_tests)
     add_test(NAME abyss_cursor_tests COMMAND abyss_cursor_tests)
 
+    # Reads both programs, without running them, and checks their exploit
+    # mitigations, where their DLLs load from, their imports, the manifest and
+    # the version information. The Release run also checks that no build path
+    # or debug-database path is left in them.
+    add_executable(abyss_binary_tests tests/binary_tests.cpp)
+    target_compile_features(abyss_binary_tests PRIVATE cxx_std_17)
+    target_compile_definitions(abyss_binary_tests PRIVATE UNICODE _UNICODE NOMINMAX)
+    target_link_libraries(abyss_binary_tests PRIVATE advapi32 version)
+    add_dependencies(abyss_binary_tests AbyssCursorHide RestoreCursor)
+    abyss_msvc_options(abyss_binary_tests)
+    add_test(NAME abyss_binary_tests
+        COMMAND abyss_binary_tests
+            $<TARGET_FILE:AbyssCursorHide>
+            $<TARGET_FILE:RestoreCursor>
+            ${PROJECT_VERSION}
+            $<IF:$<CONFIG:Release>,release,other>
+            ${CMAKE_SOURCE_DIR}
+            ${CMAKE_BINARY_DIR})
+
     if(ABYSS_SYSTEM_CURSOR_TESTS)
         # Hides and restores the real system cursors thousands of times and
         # runs the app's --restore and --watch modes. Even when built, it only
