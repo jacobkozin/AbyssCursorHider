@@ -318,7 +318,12 @@ std::vector<std::string> DelayLoadedDlls(const PeFile& pe, bool& all_rva_based)
 // could be found next to the program before wWinMain can restrict loading.
 bool IsKnownDll(const std::string& dll)
 {
-    if (dll.rfind("api-ms-win-", 0) == 0 || dll.rfind("ext-ms-", 0) == 0)
+    // Windows loads these into every process before it resolves the program's
+    // imports; Windows Server does not list kernel32 under KnownDLLs.
+    constexpr std::array<std::string_view, 3> kAlwaysLoaded = {
+        "ntdll.dll", "kernel32.dll", "kernelbase.dll"};
+    if (std::find(kAlwaysLoaded.begin(), kAlwaysLoaded.end(), dll) != kAlwaysLoaded.end() ||
+        dll.rfind("api-ms-win-", 0) == 0 || dll.rfind("ext-ms-", 0) == 0)
     {
         return true;
     }
