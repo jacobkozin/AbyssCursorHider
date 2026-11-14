@@ -3,7 +3,7 @@
 Notable changes are recorded here. The v4 entries are reconstructed from the
 verified release notes and development conversation; v4.17 itself is binary-only.
 
-## [5.0.1] - 2026-11-13
+## [5.0.1] - 2026-11-14
 
 ### Fixed
 
