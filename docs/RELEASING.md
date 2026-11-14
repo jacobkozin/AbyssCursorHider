@@ -55,8 +55,9 @@ Publishing runs the **Build and test** workflow for the tag, and its
 
 If the job fails for a reason that has nothing to do with the source, such as
 a runner problem, open the run and choose **Re-run failed jobs**; it builds the
-same tagged commit again. If the source itself is wrong, delete the release and
-the tag, fix the problem on `main`, and start again from step 1.
+same tagged commit again. If the source itself is wrong, fix it on `main` and
+release the next patch version. The **Protect version tags** ruleset blocks
+moving or deleting `v*` tags, so a published tag always means the same code.
 
 ## 3. Check
 
