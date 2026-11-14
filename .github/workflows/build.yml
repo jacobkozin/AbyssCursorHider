@@ -47,10 +47,10 @@ jobs:
             Select-Object -First 10 | ForEach-Object { "::error::$($_.Line)" }
           exit $code
 
-      # Copies the end of the test output into notices on the run's summary
-      # page, so it can be read there without opening the log.
+      # When a test fails, copies the end of the test output into notices on the
+      # run's summary page, so it can be read there without opening the log.
       - name: Report test output
-        if: always() && hashFiles('ctest-output.txt') != ''
+        if: failure() && hashFiles('ctest-output.txt') != ''
         run: |
           $text = (Get-Content -Raw ctest-output.txt) -replace "`r", ''
           $size = 3900
