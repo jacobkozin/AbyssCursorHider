@@ -111,7 +111,7 @@ failure.
 For a role that is still transparent after the reload, the controller puts its
 copy back with `SetSystemCursor`. Windows takes ownership of the copy, so this
 needs no new handles and works even in a process short of them. An animated
-cursor comes back as a still image until the next successful reload.
+cursor may come back as a still image until the next successful reload.
 
 ### `src/windows_settings.cpp`
 

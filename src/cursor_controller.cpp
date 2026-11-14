@@ -238,8 +238,8 @@ CursorController::~CursorController()
 // longer has the handles to load; Windows then keeps the transparent cursor.
 // So Hide keeps a copy of every visible cursor, and this puts the copy back
 // for each role that is still transparent. Windows takes ownership of a copy
-// it accepts, so this needs no new handles. An animated cursor comes back as
-// a still image until the next successful reload.
+// it accepts, so this needs no new handles. An animated cursor may come back
+// as a still image until the next successful reload.
 void CursorController::PutBackSavedCursors() noexcept
 {
     const CursorRoleMask visible = VisibleCursorRoles();
