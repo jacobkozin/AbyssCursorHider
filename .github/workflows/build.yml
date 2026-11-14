@@ -39,7 +39,28 @@ jobs:
           # Hosted runners are thrown away after each job, so the tests that
           # hide and restore the real system cursors may run here.
           ABYSS_SYSTEM_CURSOR_TESTS: "1"
-        run: ctest --preset ${{ matrix.preset }} --verbose
+        run: |
+          ctest --preset ${{ matrix.preset }} --verbose | Tee-Object -FilePath ctest-output.txt
+          $code = $LASTEXITCODE
+          # Failed checks also show as annotations on the run's summary page.
+          Select-String -Path ctest-output.txt -Pattern 'FAIL' -CaseSensitive |
+            Select-Object -First 10 | ForEach-Object { "::error::$($_.Line)" }
+          exit $code
+
+      # Copies the end of the test output into notices on the run's summary
+      # page, so it can be read there without opening the log.
+      - name: Report test output
+        if: always() && hashFiles('ctest-output.txt') != ''
+        run: |
+          $text = (Get-Content -Raw ctest-output.txt) -replace "`r", ''
+          $size = 3900
+          if ($text.Length -gt 10 * $size) { $text = $text.Substring($text.Length - 10 * $size) }
+          $parts = [Math]::Ceiling($text.Length / $size)
+          for ($i = 0; $i -lt $parts; $i++) {
+            $chunk = $text.Substring($i * $size, [Math]::Min($size, $text.Length - $i * $size))
+            $escaped = $chunk.Replace('%', '%25').Replace("`n", '%0A')
+            Write-Output ('::notice title=Test output {0} of {1}::{2}' -f ($i + 1), $parts, $escaped)
+          }
 
       - name: Package
         if: matrix.preset == 'release'
